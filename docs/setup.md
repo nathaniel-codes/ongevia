@@ -87,9 +87,21 @@ Health check: `curl http://127.0.0.1:3010/api/health`
 
 ## 6. GitHub auto-deploy
 
-1. Add repo secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_APP_DIR`
+Repo: https://github.com/nathaniel-codes/ongevia
+
+1. In GitHub → Settings → Secrets and variables → Actions, add:
+   - `VPS_HOST` = `104.219.236.43`
+   - `VPS_USER` = `root`
+   - `VPS_APP_DIR` = `/opt/ongevia`
+   - `VPS_SSH_KEY` = private key whose public half is in `/root/.ssh/authorized_keys` on the VPS
 2. Workflow `.github/workflows/deploy.yml` runs on push to `main`
-3. It SSHs in, `git pull`, `npm ci`, migrate, build, restart services
+3. It SSHs in and runs `deploy/deploy.sh` (`git pull`, migrate, build, restart)
+
+If Actions secrets cannot be set via CLI, add them in the GitHub UI. Manual deploy:
+
+```bash
+ssh root@104.219.236.43 'cd /opt/ongevia && bash deploy/deploy.sh'
+```
 
 ## 7. Meta app
 
