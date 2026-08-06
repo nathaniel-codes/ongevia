@@ -4,29 +4,31 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/ongevia}"
 cd "$APP_DIR"
 
-echo "[deploy] pulling…"
-git fetch --all
-git reset --hard origin/main
-
-# Support monorepo layout where app lives in ./ongevia
-if [[ -f package.json ]]; then
-  ROOT="."
-elif [[ -f ongevia/package.json ]]; then
-  ROOT="ongevia"
+echo "[deploy] syncing from GitHub…"
+git config --global --add safe.directory "$APP_DIR" || true
+if [ -d .git ]; then
+  git remote set-url origin https://github.com/nathaniel-codes/ongevia.git || true
+  git fetch --all
+  git reset --hard origin/main
 else
-  echo "package.json not found"
-  exit 1
+  echo "[deploy] no git repo — skipping pull (rsync/manual deploy)"
 fi
 
-cd "$ROOT"
 ln -sfn /etc/ongevia/.env .env
+set -a
+# shellcheck disable=SC1091
+source /etc/ongevia/.env
+set +a
 
-echo "[deploy] npm ci…"
-npm ci
+echo "[deploy] npm install…"
+npm install --omit=dev=false
 npx prisma generate
 npx prisma migrate deploy
 npm run build
 
 systemctl restart ongevia-web ongevia-worker
+sleep 2
 systemctl --no-pager --full status ongevia-web ongevia-worker | head -40
+curl -fsS http://127.0.0.1:3010/api/health || true
+echo
 echo "[deploy] done"
