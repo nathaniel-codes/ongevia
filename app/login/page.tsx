@@ -1,95 +1,205 @@
-import { signIn } from "@/lib/auth";
+import { auth, signIn } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
+import { normalizePhone, createPhoneOtp } from "@/lib/phone";
+import { sendBeemSms } from "@/lib/services/beem-sms";
+import { prisma } from "@/lib/db/client";
+import { logAction } from "@/lib/action-log";
 
 export const metadata = {
-  title: "Login - OpenReply",
-  description: "Sign in to manage Instagram comment-to-DM campaigns.",
+  title: "Login - Ongevia",
+  description: "Sign in with your phone to manage Instagram comment-to-DM campaigns.",
 };
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    checkEmail?: string;
     callbackUrl?: string;
     template?: string;
+    error?: string;
+    phone?: string;
+    step?: string;
   }>;
 }) {
+  const session = await auth();
   const params = await searchParams;
-  const checkEmail = params.checkEmail === "1";
   const selectedTemplate = getCampaignTemplate(params.template);
   const templateCallbackUrl = selectedTemplate
     ? `/campaigns/new?template=${selectedTemplate.slug}`
     : null;
   const callbackUrl = params.callbackUrl ?? templateCallbackUrl ?? "/dashboard";
 
-  async function sendMagicLink(formData: FormData) {
+  if (session?.user) {
+    redirect(callbackUrl);
+  }
+
+  const step = params.step === "otp" ? "otp" : "phone";
+  const phone = params.phone ?? "";
+
+  async function requestOtp(formData: FormData) {
     "use server";
-    await signIn("resend", {
-      email: String(formData.get("email") ?? ""),
-      redirectTo: callbackUrl,
+    const phoneValue = String(formData.get("phone") ?? "");
+    const normalized = normalizePhone(phoneValue);
+    if (!normalized) {
+      redirect(
+        `/login?error=${encodeURIComponent("Enter a valid Tanzania phone number (e.g. 07XXXXXXXX).")}&phone=${encodeURIComponent(phoneValue)}`
+      );
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { phone: normalized },
+      select: { isSuspended: true },
     });
+    if (existing?.isSuspended) {
+      redirect(
+        `/login?error=${encodeURIComponent("This account is suspended.")}&phone=${encodeURIComponent(phoneValue)}`
+      );
+    }
+
+    const recent = await prisma.phoneOtp.count({
+      where: {
+        phone: normalized,
+        createdAt: { gt: new Date(Date.now() - 10 * 60 * 1000) },
+      },
+    });
+    if (recent >= 3) {
+      redirect(
+        `/login?error=${encodeURIComponent("Too many codes requested. Wait a few minutes.")}&phone=${encodeURIComponent(phoneValue)}`
+      );
+    }
+
+    const code = await createPhoneOtp(normalized);
+    const sms = await sendBeemSms({
+      destAddr: normalized,
+      message: `Your Ongevia login code is ${code}. Valid for 10 minutes.`,
+    });
+    if (!sms.ok) {
+      await logAction({
+        actorType: "SYSTEM",
+        action: "auth.otp_sms_failed",
+        meta: { phone: normalized, error: sms.error },
+      });
+      redirect(
+        `/login?error=${encodeURIComponent("Could not send SMS. Try again shortly.")}&phone=${encodeURIComponent(phoneValue)}`
+      );
+    }
+
+    await logAction({
+      actorType: "SYSTEM",
+      action: "auth.otp_sent",
+      meta: { phone: normalized },
+    });
+
+    redirect(
+      `/login?step=otp&phone=${encodeURIComponent(phoneValue)}&callbackUrl=${encodeURIComponent(callbackUrl)}`
+    );
+  }
+
+  async function verifyOtp(formData: FormData) {
+    "use server";
+    const phoneValue = String(formData.get("phone") ?? "");
+    const code = String(formData.get("code") ?? "");
+    try {
+      await signIn("phone-otp", {
+        phone: phoneValue,
+        code,
+        redirectTo: callbackUrl,
+      });
+    } catch (err) {
+      if (
+        err &&
+        typeof err === "object" &&
+        "digest" in err &&
+        String((err as { digest?: string }).digest).startsWith("NEXT_REDIRECT")
+      ) {
+        throw err;
+      }
+      redirect(
+        `/login?step=otp&phone=${encodeURIComponent(phoneValue)}&error=${encodeURIComponent("Invalid or expired code")}&callbackUrl=${encodeURIComponent(callbackUrl)}`
+      );
+    }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-foreground">
-            OpenReply
-          </h1>
-          <p className="text-muted text-sm leading-relaxed mt-2">
+          <Link
+            href="/"
+            className="font-display text-4xl font-semibold text-foreground tracking-tight"
+          >
+            Ongevia
+          </Link>
+          <p className="text-muted text-sm leading-relaxed mt-3">
             {selectedTemplate
               ? `Sign in to use the ${selectedTemplate.title} template.`
-              : "Sign in by email, then connect your Instagram professional account."}
+              : "Sign in with your phone, then connect your Instagram professional account."}
           </p>
         </div>
 
-        <div className="panel rounded p-8 shadow-black/40">
-          {selectedTemplate && !checkEmail && (
-            <div className="mb-5 border border-accent/20 bg-accent/10 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
-                Template selected
-              </p>
-              <p className="mt-2 text-sm font-semibold text-foreground">
-                {selectedTemplate.title}
-              </p>
-            </div>
+        <div className="panel rounded-xl p-8 shadow-sm">
+          {params.error && (
+            <p className="mb-4 text-sm text-error">{params.error}</p>
           )}
 
-          {checkEmail ? (
-            <div className="text-center py-4">
-              <h2 className="text-lg font-semibold mb-2">Check your email</h2>
+          {step === "otp" ? (
+            <form action={verifyOtp} className="space-y-5">
+              <input type="hidden" name="phone" value={phone} />
               <p className="text-sm text-muted">
-                We sent you a secure sign-in link. Open it on this device to
-                continue.
+                Enter the 6-digit code sent to{" "}
+                <span className="font-medium text-foreground">{phone}</span>
               </p>
-            </div>
-          ) : (
-            <form action={sendMagicLink} className="space-y-5">
               <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-foreground"
-                >
-                  Work email
+                <label htmlFor="code" className="block text-sm font-medium">
+                  Login code
                 </label>
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
+                  id="code"
+                  name="code"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
                   required
-                  autoComplete="email"
-                  placeholder="you@company.com"
-                  className="w-full px-4 py-3 rounded bg-surface border border-border text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none transition-colors"
+                  maxLength={6}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm tracking-widest"
                 />
               </div>
-
               <button
                 type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 rounded bg-accent px-6 py-3.5 text-sm font-semibold text-white shadow-indigo-500/25 transition-all hover:shadow-indigo-500/30"
+                className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover"
               >
-                Email me a magic link
+                Verify & sign in
+              </button>
+              <Link
+                href="/login"
+                className="block text-center text-sm text-muted hover:text-foreground"
+              >
+                Use a different number
+              </Link>
+            </form>
+          ) : (
+            <form action={requestOtp} className="space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="phone" className="block text-sm font-medium">
+                  Phone number
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  required
+                  defaultValue={phone}
+                  placeholder="07XXXXXXXX"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover"
+              >
+                Send login code
               </button>
             </form>
           )}

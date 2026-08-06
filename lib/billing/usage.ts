@@ -1,12 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import type { Prisma } from "@/app/generated/prisma/client";
-
-// Self-hosted build: usage is still counted per month so the dashboard can
-// report volume, but no cap is enforced. Meta's own rate limits apply instead.
-// Must stay within PostgreSQL int4 range, since dmsSentThisPeriod is an Int
-// column and this value is used in a `less-than` comparison against it. Two
-// billion DMs/month is effectively unlimited without overflowing the column.
-const MONTHLY_DM_LIMIT = 2_000_000_000;
+import { spendDmCredits, refundDmCredits, getDmCreditCost } from "@/lib/wallet";
 
 function getMonthStart(date = new Date()): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -48,10 +42,20 @@ export interface WorkspaceDMReservation {
 export async function reserveWorkspaceDMSend(
   workspaceId: string
 ): Promise<WorkspaceDMReservation> {
+  const credit = await spendDmCredits(workspaceId);
+  if (!credit.allowed) {
+    return {
+      allowed: false,
+      reserved: false,
+      remaining: credit.remaining,
+      limit: credit.remaining,
+      periodStart: null,
+    };
+  }
+
   return prisma.$transaction(async (tx) => {
     await resetUsageIfNeededTx(tx, workspaceId);
 
-    const monthStart = getMonthStart();
     const workspace = await tx.workspace.findUnique({
       where: { id: workspaceId },
       select: {
@@ -61,6 +65,7 @@ export async function reserveWorkspaceDMSend(
     });
 
     if (!workspace) {
+      await refundDmCredits(workspaceId);
       return {
         allowed: false,
         reserved: false,
@@ -70,49 +75,16 @@ export async function reserveWorkspaceDMSend(
       };
     }
 
-    const limit = MONTHLY_DM_LIMIT;
-
-    if (workspace.dmsSentThisPeriod >= limit) {
-      return {
-        allowed: false,
-        reserved: false,
-        remaining: 0,
-        limit,
-        periodStart: workspace.usagePeriodStart,
-      };
-    }
-
-    const reserved = await tx.workspace.updateMany({
-      where: {
-        id: workspaceId,
-        usagePeriodStart: { gte: monthStart },
-        dmsSentThisPeriod: { lt: limit },
-      },
-      data: {
-        dmsSentThisPeriod: { increment: 1 },
-      },
+    await tx.workspace.update({
+      where: { id: workspaceId },
+      data: { dmsSentThisPeriod: { increment: 1 } },
     });
-
-    if (reserved.count === 0) {
-      const current = await tx.workspace.findUnique({
-        where: { id: workspaceId },
-        select: { dmsSentThisPeriod: true, usagePeriodStart: true },
-      });
-
-      return {
-        allowed: false,
-        reserved: false,
-        remaining: Math.max(0, limit - (current?.dmsSentThisPeriod ?? limit)),
-        limit,
-        periodStart: current?.usagePeriodStart ?? workspace.usagePeriodStart,
-      };
-    }
 
     return {
       allowed: true,
       reserved: true,
-      remaining: Math.max(0, limit - workspace.dmsSentThisPeriod - 1),
-      limit,
+      remaining: credit.remaining,
+      limit: credit.remaining + credit.cost,
       periodStart: workspace.usagePeriodStart,
     };
   });
@@ -124,25 +96,22 @@ export async function canSendDMForWorkspace(workspaceId: string): Promise<{
   limit: number;
 }> {
   await resetUsageIfNeeded(workspaceId);
-
+  const cost = await getDmCreditCost();
   const workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
-    select: {
-      dmsSentThisPeriod: true,
-    },
+    select: { ownerId: true },
   });
-
   if (!workspace) {
     return { allowed: false, remaining: 0, limit: 0 };
   }
-
-  const limit = MONTHLY_DM_LIMIT;
-  const remaining = Math.max(0, limit - workspace.dmsSentThisPeriod);
-
+  const wallet = await prisma.wallet.findUnique({
+    where: { userId: workspace.ownerId },
+  });
+  const balance = wallet?.balance ?? 0;
   return {
-    allowed: workspace.dmsSentThisPeriod < limit,
-    remaining,
-    limit,
+    allowed: cost === 0 || balance >= cost,
+    remaining: balance,
+    limit: balance,
   };
 }
 
@@ -150,6 +119,8 @@ export async function releaseWorkspaceDMReservation(
   workspaceId: string,
   periodStart: Date | null
 ) {
+  await refundDmCredits(workspaceId);
+
   if (!periodStart) {
     return { count: 0 };
   }

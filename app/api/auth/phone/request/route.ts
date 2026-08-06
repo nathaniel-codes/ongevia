@@ -1,0 +1,68 @@
+import { NextResponse } from "next/server";
+import { normalizePhone, createPhoneOtp } from "@/lib/phone";
+import { sendBeemSms } from "@/lib/services/beem-sms";
+import { prisma } from "@/lib/db/client";
+import { logAction } from "@/lib/action-log";
+
+export async function POST(request: Request) {
+  const body = await request.json().catch(() => null);
+  const phone = normalizePhone(String(body?.phone ?? ""));
+
+  if (!phone) {
+    return NextResponse.json(
+      { error: "Enter a valid Tanzania phone number (e.g. 07XXXXXXXX)." },
+      { status: 400 }
+    );
+  }
+
+  const existing = await prisma.user.findUnique({
+    where: { phone },
+    select: { isSuspended: true },
+  });
+  if (existing?.isSuspended) {
+    return NextResponse.json(
+      { error: "This account is suspended." },
+      { status: 403 }
+    );
+  }
+
+  // Rate-limit: max 3 OTPs per phone per 10 minutes
+  const recent = await prisma.phoneOtp.count({
+    where: {
+      phone,
+      createdAt: { gt: new Date(Date.now() - 10 * 60 * 1000) },
+    },
+  });
+  if (recent >= 3) {
+    return NextResponse.json(
+      { error: "Too many codes requested. Wait a few minutes." },
+      { status: 429 }
+    );
+  }
+
+  const code = await createPhoneOtp(phone);
+  const sms = await sendBeemSms({
+    destAddr: phone,
+    message: `Your Ongevia login code is ${code}. Valid for 10 minutes.`,
+  });
+
+  if (!sms.ok) {
+    await logAction({
+      actorType: "SYSTEM",
+      action: "auth.otp_sms_failed",
+      meta: { phone, error: sms.error, body: sms.body as object },
+    });
+    return NextResponse.json(
+      { error: "Could not send SMS. Try again shortly." },
+      { status: 502 }
+    );
+  }
+
+  await logAction({
+    actorType: "SYSTEM",
+    action: "auth.otp_sent",
+    meta: { phone },
+  });
+
+  return NextResponse.json({ ok: true, phone });
+}

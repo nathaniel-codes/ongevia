@@ -1,9 +1,15 @@
 import { randomBytes } from "node:crypto";
+import { normalizePhone } from "@/lib/phone";
 
 const INVITE_TTL_DAYS = 14;
 
+export function normalizeInvitationPhone(phone: string) {
+  return normalizePhone(phone);
+}
+
+/** @deprecated use normalizeInvitationPhone */
 export function normalizeInvitationEmail(email: string) {
-  return email.trim().toLowerCase();
+  return normalizePhone(email) ?? email.trim().toLowerCase();
 }
 
 export function generateInvitationToken() {
@@ -21,8 +27,7 @@ export function buildInvitationUrl(token: string, baseUrl?: string) {
     baseUrl ??
     (typeof window !== "undefined"
       ? window.location.origin
-      : process.env.NEXTAUTH_URL ?? "http://localhost:3000");
+      : process.env.NEXTAUTH_URL ?? "http://localhost:3010");
 
   return `${resolvedBaseUrl.replace(/\/$/, "")}/invite/${token}`;
 }
-

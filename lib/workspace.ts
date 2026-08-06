@@ -1,21 +1,20 @@
 import { prisma } from "@/lib/db/client";
 import type { Workspace, WorkspaceRole } from "@/app/generated/prisma/client";
-
-function normalizeInviteEmail(email: string) {
-  return email.trim().toLowerCase();
-}
+import { normalizePhone } from "@/lib/phone";
 
 export async function acceptPendingInvitationsForUser(
   userId: string,
-  email?: string | null
+  phoneOrEmail?: string | null
 ): Promise<void> {
-  if (!email) return;
+  if (!phoneOrEmail) return;
 
-  const normalizedEmail = normalizeInviteEmail(email);
+  const phone = normalizePhone(phoneOrEmail);
+  if (!phone) return;
+
   const now = new Date();
   const invitations = await prisma.workspaceInvitation.findMany({
     where: {
-      email: normalizedEmail,
+      phone,
       status: "PENDING",
       expiresAt: { gt: now },
     },
@@ -70,16 +69,21 @@ export async function getWorkspaceMembership(userId: string): Promise<{
 
 export async function ensureWorkspaceForUser(
   userId: string,
-  email?: string | null
+  phoneOrEmail?: string | null
 ): Promise<Workspace> {
-  await acceptPendingInvitationsForUser(userId, email);
+  await acceptPendingInvitationsForUser(userId, phoneOrEmail);
 
   const existingMembership = await getWorkspaceMembership(userId);
   if (existingMembership) {
     return existingMembership.workspace;
   }
 
-  const workspaceName = email ? `${email.split("@")[0]}'s workspace` : "My workspace";
+  const phone = phoneOrEmail ? normalizePhone(phoneOrEmail) : null;
+  const workspaceName = phone
+    ? `Workspace ${phone.slice(-4)}`
+    : phoneOrEmail?.includes("@")
+      ? `${phoneOrEmail.split("@")[0]}'s workspace`
+      : "My workspace";
 
   return prisma.workspace.create({
     data: {

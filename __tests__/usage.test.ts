@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockPrisma, mockTx } = vi.hoisted(() => {
+const { mockPrisma, mockTx, mockSpend, mockRefund } = vi.hoisted(() => {
   const tx = {
     workspace: {
       findUnique: vi.fn(),
+      update: vi.fn(),
       updateMany: vi.fn(),
     },
   };
 
   return {
     mockTx: tx,
+    mockSpend: vi.fn(),
+    mockRefund: vi.fn(),
     mockPrisma: {
       $transaction: vi.fn((callback: (txArg: typeof tx) => unknown) =>
         callback(tx)
@@ -26,6 +29,12 @@ vi.mock("@/lib/db/client", () => ({
   prisma: mockPrisma,
 }));
 
+vi.mock("@/lib/wallet", () => ({
+  spendDmCredits: mockSpend,
+  refundDmCredits: mockRefund,
+  getDmCreditCost: vi.fn(async () => 1),
+}));
+
 import {
   releaseWorkspaceDMReservation,
   reserveWorkspaceDMSend,
@@ -35,92 +44,51 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-05-24T12:00:00.000Z"));
+  mockSpend.mockResolvedValue({ allowed: true, remaining: 99, cost: 1 });
+  mockRefund.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-// Mirrors MONTHLY_DM_LIMIT in lib/billing/usage.ts. Must stay within int4
-// range so the value can be compared against the dmsSentThisPeriod column.
-const LIMIT = 2_000_000_000;
-
 describe("reserveWorkspaceDMSend", () => {
-  it("atomically increments usage when the workspace is under its limit", async () => {
-    const periodStart = new Date("2026-05-01T00:00:00.000Z");
-    mockTx.workspace.updateMany
-      .mockResolvedValueOnce({ count: 0 })
-      .mockResolvedValueOnce({ count: 1 });
-    mockTx.workspace.findUnique.mockResolvedValueOnce({
-      usagePeriodStart: periodStart,
-      dmsSentThisPeriod: 99,
-    });
-
-    const result = await reserveWorkspaceDMSend("workspace_123");
-
-    expect(result).toEqual({
-      allowed: true,
-      reserved: true,
-      remaining: LIMIT - 100,
-      limit: LIMIT,
-      periodStart,
-    });
-    expect(mockTx.workspace.updateMany).toHaveBeenNthCalledWith(2, {
-      where: {
-        id: "workspace_123",
-        usagePeriodStart: { gte: new Date(2026, 4, 1) },
-        dmsSentThisPeriod: { lt: LIMIT },
-      },
-      data: { dmsSentThisPeriod: { increment: 1 } },
-    });
-  });
-
-  it("denies without incrementing when the limit is already reached", async () => {
+  it("reserves when wallet credits allow", async () => {
     const periodStart = new Date("2026-05-01T00:00:00.000Z");
     mockTx.workspace.updateMany.mockResolvedValueOnce({ count: 0 });
     mockTx.workspace.findUnique.mockResolvedValueOnce({
       usagePeriodStart: periodStart,
-      dmsSentThisPeriod: LIMIT,
+      dmsSentThisPeriod: 99,
     });
+    mockTx.workspace.update.mockResolvedValueOnce({});
 
     const result = await reserveWorkspaceDMSend("workspace_123");
 
-    expect(result.allowed).toBe(false);
-    expect(result.reserved).toBe(false);
-    expect(result.remaining).toBe(0);
-    expect(mockTx.workspace.updateMany).toHaveBeenCalledTimes(1);
+    expect(result.allowed).toBe(true);
+    expect(result.reserved).toBe(true);
+    expect(result.remaining).toBe(99);
+    expect(mockSpend).toHaveBeenCalledWith("workspace_123");
   });
 
-  it("denies if another concurrent reservation wins the last slot", async () => {
-    const periodStart = new Date("2026-05-01T00:00:00.000Z");
-    mockTx.workspace.updateMany
-      .mockResolvedValueOnce({ count: 0 })
-      .mockResolvedValueOnce({ count: 0 });
-    mockTx.workspace.findUnique
-      .mockResolvedValueOnce({
-        usagePeriodStart: periodStart,
-        dmsSentThisPeriod: 99,
-      })
-      .mockResolvedValueOnce({
-        usagePeriodStart: periodStart,
-        dmsSentThisPeriod: 100,
-      });
+  it("denies when wallet has insufficient credits", async () => {
+    mockSpend.mockResolvedValueOnce({ allowed: false, remaining: 0, cost: 1 });
 
     const result = await reserveWorkspaceDMSend("workspace_123");
 
     expect(result.allowed).toBe(false);
     expect(result.reserved).toBe(false);
-    expect(result.remaining).toBe(LIMIT - 100);
+    expect(mockTx.workspace.findUnique).not.toHaveBeenCalled();
   });
 });
 
 describe("releaseWorkspaceDMReservation", () => {
-  it("decrements only the reserved period", async () => {
+  it("refunds credits and decrements usage", async () => {
     const periodStart = new Date("2026-05-01T00:00:00.000Z");
     mockPrisma.workspace.updateMany.mockResolvedValue({ count: 1 });
 
     await releaseWorkspaceDMReservation("workspace_123", periodStart);
 
+    expect(mockRefund).toHaveBeenCalledWith("workspace_123");
     expect(mockPrisma.workspace.updateMany).toHaveBeenCalledWith({
       where: {
         id: "workspace_123",

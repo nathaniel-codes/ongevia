@@ -1,6 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/automations", "/logs", "/settings"];
+const PROTECTED_PREFIXES = [
+  "/admin",
+  "/dashboard",
+  "/automations",
+  "/logs",
+  "/settings",
+  "/wallet",
+  "/activity",
+  "/campaigns",
+  "/overview",
+  "/inbox",
+  "/diagnostics",
+];
 
 function hasSessionCookie(request: NextRequest): boolean {
   return (
@@ -17,10 +29,14 @@ export function proxy(request: NextRequest) {
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
   const isLogin = pathname === "/login";
+  const isAdminLogin = pathname === "/admin/login";
   const isAuthenticated = hasSessionCookie(request);
 
-  if (isProtected && !isAuthenticated) {
-    const loginUrl = new URL("/login", request.url);
+  if (isProtected && !isAuthenticated && !isAdminLogin) {
+    const loginUrl = new URL(
+      pathname.startsWith("/admin") ? "/admin/login" : "/login",
+      request.url
+    );
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -38,6 +54,14 @@ export const config = {
     "/automations/:path*",
     "/logs/:path*",
     "/settings/:path*",
+    "/wallet/:path*",
+    "/activity/:path*",
+    "/campaigns/:path*",
+    "/overview/:path*",
+    "/inbox/:path*",
+    "/diagnostics/:path*",
+    "/admin",
+    "/admin/:path*",
     "/login",
   ],
 };

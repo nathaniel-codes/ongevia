@@ -5,15 +5,17 @@ import {
   buildInvitationUrl,
   generateInvitationToken,
   getInvitationExpiry,
-  normalizeInvitationEmail,
+  normalizeInvitationPhone,
 } from "@/lib/workspace-invitations";
 import {
   canManageWorkspace,
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
+import { logAction } from "@/lib/action-log";
+import { sendBeemSms } from "@/lib/services/beem-sms";
 
 const inviteSchema = z.object({
-  email: z.string().email(),
+  phone: z.string().min(9),
   role: z.enum(["ADMIN", "MEMBER"]).default("MEMBER"),
 });
 
@@ -42,6 +44,7 @@ async function getMemberPayload(
         user: {
           select: {
             id: true,
+            phone: true,
             email: true,
             name: true,
           },
@@ -53,7 +56,7 @@ async function getMemberPayload(
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
-        email: true,
+        phone: true,
         role: true,
         token: true,
         expiresAt: true,
@@ -113,9 +116,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const email = normalizeInvitationEmail(parsed.data.email);
+  const phone = normalizeInvitationPhone(parsed.data.phone);
+  if (!phone) {
+    return NextResponse.json(
+      { success: false, error: "Invalid phone number" },
+      { status: 400 }
+    );
+  }
+
   const existingUser = await prisma.user.findUnique({
-    where: { email },
+    where: { phone },
     select: { id: true },
   });
 
@@ -137,30 +147,44 @@ export async function POST(request: NextRequest) {
       },
     });
   } else {
+    const token = generateInvitationToken();
     await prisma.workspaceInvitation.upsert({
       where: {
-        workspaceId_email: {
+        workspaceId_phone: {
           workspaceId: context.workspaceId,
-          email,
+          phone,
         },
       },
       create: {
         workspaceId: context.workspaceId,
-        email,
+        phone,
         role: parsed.data.role,
-        token: generateInvitationToken(),
+        token,
         invitedByUserId: context.userId,
         expiresAt: getInvitationExpiry(),
       },
       update: {
         role: parsed.data.role,
         status: "PENDING",
-        token: generateInvitationToken(),
+        token,
         invitedByUserId: context.userId,
         expiresAt: getInvitationExpiry(),
       },
     });
+
+    const inviteUrl = buildInvitationUrl(token);
+    await sendBeemSms({
+      destAddr: phone,
+      message: `You are invited to an Ongevia workspace. Open: ${inviteUrl}`,
+    });
   }
+
+  await logAction({
+    actorUserId: context.userId,
+    action: "workspace.invite",
+    workspaceId: context.workspaceId,
+    meta: { phone, role: parsed.data.role },
+  });
 
   return NextResponse.json({
     success: true,

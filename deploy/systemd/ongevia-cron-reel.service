@@ -1,0 +1,7 @@
+[Unit]
+Description=Ongevia cron: attach next reel
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/ongevia/.env
+ExecStart=/usr/bin/curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" http://127.0.0.1:3010/api/cron/attach-next-reel

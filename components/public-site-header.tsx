@@ -6,17 +6,15 @@ interface PublicSiteHeaderProps {
 
 const navLinks = [
   { label: "Templates", href: "/templates", key: "templates" },
-  { label: "Agencies", href: "/instagram-dm-automation-agencies", key: "agencies" },
-  { label: "Pricing", href: "/#pricing", key: "pricing" },
-  { label: "Security", href: "/#security", key: "security" },
+  { label: "How it works", href: "/#how", key: "how" },
 ];
 
 export default function PublicSiteHeader({ active }: PublicSiteHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-background/85">
+    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3" aria-label="OpenReply home">
-          <span className="text-lg font-bold text-white">OpenReply</span>
+        <Link href="/" className="font-display text-2xl font-semibold tracking-tight text-foreground" aria-label="Ongevia home">
+          Ongevia
         </Link>
 
         <nav className="hidden items-center gap-7 md:flex">
@@ -25,7 +23,7 @@ export default function PublicSiteHeader({ active }: PublicSiteHeaderProps) {
               key={link.key}
               href={link.href}
               className={`text-sm font-medium transition ${
-                active === link.key ? "text-white" : "text-zinc-400 hover:text-white"
+                active === link.key ? "text-foreground" : "text-muted hover:text-foreground"
               }`}
             >
               {link.label}
@@ -36,15 +34,15 @@ export default function PublicSiteHeader({ active }: PublicSiteHeaderProps) {
         <div className="flex items-center gap-2">
           <Link
             href="/login"
-            className="hidden px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:text-white sm:inline-flex"
+            className="hidden px-4 py-2 text-sm font-semibold text-muted transition hover:text-foreground sm:inline-flex"
           >
             Sign in
           </Link>
           <Link
             href="/login"
-            className="inline-flex items-center justify-center bg-cyan-300 px-4 py-2 text-sm font-bold text-zinc-950 transition hover:bg-cyan-200"
+            className="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-hover"
           >
-            Start free
+            Get started
           </Link>
         </div>
       </div>

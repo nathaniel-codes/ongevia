@@ -1,16 +1,17 @@
 import { createDMWorker } from "@/lib/queue/dm-worker";
 import { recordWorkerHeartbeat } from "@/lib/ops/worker-health";
 import { reconcileComments } from "@/lib/polling/comment-reconciler";
+import { pollPendingPayments } from "@/lib/payments/poller";
 import os from "node:os";
 
 const worker = createDMWorker();
 const startedAt = new Date().toISOString();
 const HEARTBEAT_INTERVAL_MS = 30_000;
-// Polling safety net for comments that webhooks miss. Runs in the worker because
-// it must fire every few minutes and Vercel's free crons only run once a day.
+// Polling safety net for comments that webhooks miss.
 const POLL_INTERVAL_MS = Number(
   process.env.COMMENT_POLL_INTERVAL_MS ?? 5 * 60_000
 );
+const PAYMENT_POLL_MS = 5_000;
 
 console.log("[DM Worker] Started");
 
@@ -43,10 +44,25 @@ async function poll() {
 setTimeout(() => void poll(), 10_000);
 const pollTimer = setInterval(() => void poll(), POLL_INTERVAL_MS);
 
+async function pollPayments() {
+  try {
+    const paid = await pollPendingPayments();
+    if (paid > 0) {
+      console.log(`[DM Worker] Credited ${paid} payment(s)`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[DM Worker] Payment poll failed:", message);
+  }
+}
+
+const paymentTimer = setInterval(() => void pollPayments(), PAYMENT_POLL_MS);
+
 async function shutdown(signal: string) {
   console.log(`[DM Worker] ${signal} received, closing worker`);
   clearInterval(heartbeatTimer);
   clearInterval(pollTimer);
+  clearInterval(paymentTimer);
   await worker.close();
   process.exit(0);
 }

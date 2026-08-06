@@ -5,13 +5,13 @@ import { useState } from "react";
 interface InvitationAcceptCardProps {
   token: string;
   isSignedIn: boolean;
-  invitedEmail: string;
+  invitedPhone: string;
 }
 
 export default function InvitationAcceptCard({
   token,
   isSignedIn,
-  invitedEmail,
+  invitedPhone,
 }: InvitationAcceptCardProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -56,9 +56,8 @@ export default function InvitationAcceptCard({
       </button>
       {message && <p className="text-sm text-error">{message}</p>}
       <p className="text-xs text-muted">
-        Use the magic link account for {invitedEmail}.
+        Sign in with phone {invitedPhone} to accept.
       </p>
     </div>
   );
 }
-

@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import PublicSiteHeader from "@/components/public-site-header";
 
 export const metadata: Metadata = {
-  title: "OpenReply - Open source Instagram comment-to-DM automation",
+  title: "Ongevia — Instagram comment-to-DM automation",
   description:
     "A free, self-hosted ManyChat alternative. Turn Instagram keyword comments into automatic private replies using the official Meta API.",
 };
 
-const GITHUB_URL = "https://github.com/diwenne/openreply";
+const GITHUB_URL = "https://github.com/diwenne/ongevia";
 
 function formatStars(count: number): string {
   if (count >= 1000) {
@@ -31,7 +32,7 @@ const flowSteps = [
     eyebrow: "Connect",
     title: "Link your Instagram professional account",
     description:
-      "Sign in by email and connect Instagram once. No password sharing, no browser automation.",
+      "Sign in with your phone and connect Instagram once. No password sharing, no browser automation.",
   },
   {
     eyebrow: "Build",
@@ -48,7 +49,7 @@ const flowSteps = [
 ];
 
 const features = [
-  "Email magic-link sign-in",
+  "Phone OTP sign-in",
   "Multiple Instagram accounts",
   "Encrypted tokens at rest",
   "Webhook + polling reconciliation",
@@ -56,7 +57,7 @@ const features = [
   "Per-account rate limiting",
   "Tracked links with click stats",
   "DM logs with full status",
-  "No plan limits, fully self-hosted",
+  "Wallet credits via mobile money",
 ];
 
 /* Static, faithful copies of the real Overview and Dashboard screens, built in
@@ -269,7 +270,7 @@ function DashboardPreview() {
 
 async function getGitHubStars(): Promise<number | null> {
   try {
-    const res = await fetch("https://api.github.com/repos/diwenne/openreply", {
+    const res = await fetch("https://api.github.com/repos/diwenne/ongevia", {
       headers: { Accept: "application/vnd.github+json" },
       next: { revalidate: 3600 },
     });
@@ -284,78 +285,47 @@ async function getGitHubStars(): Promise<number | null> {
 export default async function Home() {
   const stars = await getGitHubStars();
   return (
-    <main className="min-h-screen bg-white text-zinc-900">
-      <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-3" aria-label="OpenReply home">
-            <span className="text-lg font-bold text-zinc-900">OpenReply</span>
-          </Link>
+    <main className="min-h-screen">
+      <PublicSiteHeader active="home" />
 
-          <div className="flex items-center gap-4">
+      <section className="relative mx-auto grid w-full max-w-6xl items-center gap-10 px-5 pb-16 pt-16 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:pb-24 animate-fade-in">
+        <div className="max-w-3xl">
+          <p className="font-display text-5xl font-semibold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
+            Ongevia
+          </p>
+
+          <h1 className="mt-5 text-balance text-2xl font-medium leading-snug text-foreground sm:text-3xl">
+            Comment keywords become Instagram DMs
+          </h1>
+
+          <p className="mt-5 max-w-xl text-base leading-7 text-muted">
+            Someone comments your keyword — they get your private reply through
+            the official Meta API. Phone login, wallet top-ups, self-hosted on
+            your VPS.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-hover"
+            >
+              Get started
+            </Link>
             <a
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-600 transition hover:text-zinc-900"
-              aria-label="View OpenReply on GitHub"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted transition hover:text-foreground"
             >
               <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4 fill-current">
                 <path d={githubIconPath} />
               </svg>
-              {stars !== null && <span>{formatStars(stars)}</span>}
-            </a>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center gap-2 bg-orange-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-600"
-            >
-              Get started
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <section className="mx-auto grid w-full max-w-6xl items-center gap-10 px-5 pb-16 pt-12 sm:px-6 sm:pt-18 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:pb-24">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-600">
-            Open source · Official Meta API
-          </div>
-
-          <h1 className="mt-7 text-balance text-5xl font-black leading-[1.02] text-zinc-900 sm:text-6xl lg:text-7xl">
-            Make every comment start the right DM
-          </h1>
-
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-600">
-            Open-sourced ManyChat. When someone comments your keyword on a post
-            or reel, they get your DM a second later. Free, self-hosted, and
-            built on the official Instagram API.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center gap-2 bg-orange-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-orange-600"
-            >
-              Get started
-            </Link>
-            <a
-              href="#how"
-              className="inline-flex items-center justify-center border border-zinc-200 bg-white px-6 py-3 text-sm font-bold text-zinc-900 transition hover:border-zinc-300 hover:bg-zinc-100"
-            >
-              See how it works
+              {stars !== null ? formatStars(stars) : "GitHub"}
             </a>
           </div>
-
-          <dl className="mt-10 grid max-w-xl grid-cols-3 gap-3">
-            {heroStats.map((stat) => (
-              <div key={stat.label} className="border border-zinc-200 bg-zinc-50 p-4">
-                <dt className="text-2xl font-black text-zinc-900">{stat.value}</dt>
-                <dd className="mt-1 text-xs leading-5 text-zinc-500">{stat.label}</dd>
-              </div>
-            ))}
-          </dl>
         </div>
 
-        <div className="relative">
+        <div className="relative animate-slide-in">
           <OverviewPreview />
           <div className="absolute -bottom-8 -left-6 hidden lg:block">
             <MatchedCommentCard />
@@ -464,7 +434,7 @@ export default async function Home() {
 
       <footer className="border-t border-zinc-200 py-8">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 text-sm text-zinc-500 sm:px-6 lg:px-8">
-          <span className="font-semibold text-zinc-600">OpenReply</span>
+          <span className="font-semibold text-zinc-600">Ongevia</span>
           <a
             href={GITHUB_URL}
             target="_blank"

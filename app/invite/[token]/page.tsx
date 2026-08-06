@@ -10,7 +10,7 @@ type InvitePageProps = {
 };
 
 export const metadata: Metadata = {
-  title: "Accept Workspace Invitation - OpenReply",
+  title: "Accept Workspace Invitation - Ongevia",
   robots: { index: false, follow: false },
 };
 
@@ -33,21 +33,21 @@ export default async function InvitePage({ params }: InvitePageProps) {
   const expired = invitation.expiresAt <= new Date();
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen">
       <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-5 py-12">
-        <Link href="/" className="mb-8 text-sm font-bold text-cyan-100">
-          OpenReply
+        <Link href="/" className="mb-8 font-display text-2xl font-semibold text-foreground">
+          Ongevia
         </Link>
-        <section className="border border-white/10 bg-white/[0.035] p-8">
-          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">
+        <section className="panel rounded-xl p-8">
+          <p className="text-xs font-semibold uppercase tracking-wide text-accent">
             Workspace invitation
           </p>
-          <h1 className="mt-4 text-3xl font-black leading-tight text-white">
+          <h1 className="mt-4 font-display text-3xl font-semibold leading-tight">
             Join {invitation.workspace.name}
           </h1>
-          <p className="mt-4 text-sm leading-6 text-zinc-400">
+          <p className="mt-4 text-sm leading-6 text-muted">
             You were invited as {invitation.role.toLowerCase()} for{" "}
-            {invitation.email}.
+            {invitation.phone}.
           </p>
           <div className="mt-8">
             {expired ? (
@@ -58,7 +58,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
               <InvitationAcceptCard
                 token={token}
                 isSignedIn={Boolean(session?.user?.id)}
-                invitedEmail={invitation.email}
+                invitedPhone={invitation.phone}
               />
             )}
           </div>
@@ -67,4 +67,3 @@ export default async function InvitePage({ params }: InvitePageProps) {
     </main>
   );
 }
-

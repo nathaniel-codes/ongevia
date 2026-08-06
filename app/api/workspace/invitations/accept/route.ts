@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
-import { normalizeInvitationEmail } from "@/lib/workspace-invitations";
+import { normalizePhone } from "@/lib/phone";
+import { logAction } from "@/lib/action-log";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.id || !session.user.email) {
+  if (!session?.user?.id || !session.user.phone) {
     return NextResponse.json(
-      { success: false, error: "Sign in with the invited email first" },
+      { success: false, error: "Sign in with the invited phone first" },
       { status: 401 }
     );
   }
@@ -43,9 +44,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (normalizeInvitationEmail(session.user.email) !== invitation.email) {
+  const sessionPhone = normalizePhone(session.user.phone);
+  if (!sessionPhone || sessionPhone !== invitation.phone) {
     return NextResponse.json(
-      { success: false, error: "This invitation is for a different email" },
+      { success: false, error: "This invitation is for a different phone number" },
       { status: 403 }
     );
   }
@@ -71,6 +73,14 @@ export async function POST(request: NextRequest) {
     }),
   ]);
 
+  await logAction({
+    actorUserId: session.user.id,
+    action: "workspace.invite_accepted",
+    workspaceId: invitation.workspaceId,
+    entityType: "WorkspaceInvitation",
+    entityId: invitation.id,
+  });
+
   return NextResponse.json({
     success: true,
     data: {
@@ -78,4 +88,3 @@ export async function POST(request: NextRequest) {
     },
   });
 }
-

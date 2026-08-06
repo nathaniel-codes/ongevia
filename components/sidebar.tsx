@@ -15,6 +15,8 @@ const navItems = [
   { label: "Inbox", href: "/inbox" },
   { label: "Campaigns", href: "/campaigns" },
   { label: "DM Logs", href: "/logs" },
+  { label: "Activity", href: "/activity" },
+  { label: "Wallet", href: "/wallet" },
   { label: "Settings", href: "/settings" },
   { label: "Diagnostics", href: "/diagnostics" },
 ];
@@ -51,8 +53,8 @@ export default function Sidebar({
         `}
       >
         <div className="px-6 py-5 border-b border-border">
-          <Link href="/dashboard" className="text-base font-semibold">
-            OpenReply
+          <Link href="/dashboard" className="font-display text-xl font-semibold tracking-tight">
+            Ongevia
           </Link>
         </div>
 

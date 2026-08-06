@@ -1,0 +1,16 @@
+[Unit]
+Description=Ongevia DM + payment worker
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ongevia
+EnvironmentFile=/etc/ongevia/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run worker
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

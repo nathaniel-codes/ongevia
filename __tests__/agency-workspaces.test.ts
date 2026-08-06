@@ -83,12 +83,10 @@ describe("agency workspace helpers", () => {
     });
   });
 
-  it("normalizes invitation emails and builds invite URLs", () => {
-    expect(normalizeInvitationEmail(" Team@Agency.COM ")).toBe(
-      "team@agency.com"
-    );
-    expect(buildInvitationUrl("token_123", "https://manychat-alternative.com/")).toBe(
-      "https://manychat-alternative.com/invite/token_123"
+  it("normalizes invitation phones and builds invite URLs", () => {
+    expect(normalizeInvitationEmail(" 0755123456 ")).toBe("255755123456");
+    expect(buildInvitationUrl("token_123", "https://example.com/")).toBe(
+      "https://example.com/invite/token_123"
     );
   });
 });

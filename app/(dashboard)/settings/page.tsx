@@ -32,13 +32,14 @@ interface WorkspaceMembersData {
     createdAt: string;
     user: {
       id: string;
+      phone: string | null;
       email: string | null;
       name: string | null;
     };
   }>;
   invitations: Array<{
     id: string;
-    email: string;
+    phone: string;
     role: "OWNER" | "ADMIN" | "MEMBER";
     inviteUrl: string;
     expiresAt: string;
@@ -52,7 +53,7 @@ export default function SettingsPage() {
   );
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
   const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
   const [memberError, setMemberError] = useState<string | null>(null);
 
@@ -95,12 +96,12 @@ export default function SettingsPage() {
     const res = await fetch("/api/workspace/members", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      body: JSON.stringify({ phone: invitePhone, role: inviteRole }),
     });
     const payload = await res.json();
     if (payload.success) {
       setMembersData(payload.data);
-      setInviteEmail("");
+      setInvitePhone("");
     } else {
       setMemberError(payload.error ?? "Could not invite member");
     }
@@ -228,9 +229,9 @@ export default function SettingsPage() {
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-foreground">
-                  {member.user.name ?? member.user.email ?? "Unknown member"}
+                  {member.user.name ?? member.user.phone ?? member.user.email ?? "Unknown member"}
                 </p>
-                <p className="text-xs text-muted">{member.user.email}</p>
+                <p className="text-xs text-muted">{member.user.phone ?? member.user.email}</p>
               </div>
               <span className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted">
                 {member.role}
@@ -252,7 +253,7 @@ export default function SettingsPage() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {invitation.email}
+                      {invitation.phone}
                     </p>
                     <p className="truncate text-xs text-muted">
                       {invitation.role} · {invitation.inviteUrl}
@@ -289,10 +290,10 @@ export default function SettingsPage() {
             className="mt-6 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_140px_auto]"
           >
             <input
-              type="email"
-              value={inviteEmail}
-              onChange={(event) => setInviteEmail(event.target.value)}
-              placeholder="teammate@agency.com"
+              type="tel"
+              value={invitePhone}
+              onChange={(event) => setInvitePhone(event.target.value)}
+              placeholder="07XXXXXXXX"
               className="rounded border border-border bg-surface px-4 py-2 text-sm text-foreground outline-none transition-colors focus:border-accent/40"
               required
             />
@@ -328,7 +329,7 @@ export default function SettingsPage() {
               DMs sent this month
             </p>
             <p className="text-xs text-muted mt-0.5">
-              Self-hosted — no plan limits.
+              Credits are spent from your wallet when DMs send.
             </p>
           </div>
           <span className="text-sm font-semibold text-foreground">
