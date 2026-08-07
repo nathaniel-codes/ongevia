@@ -31,9 +31,12 @@ export default function WalletPage() {
   }
 
   useEffect(() => {
-    void load();
+    const immediate = setTimeout(() => void load(), 0);
     const t = setInterval(() => void load(), 5000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(immediate);
+      clearInterval(t);
+    };
   }, []);
 
   async function topUp(e: React.FormEvent) {
