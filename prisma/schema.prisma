@@ -237,6 +237,8 @@ model InstagramAccount {
   accessToken       String
   tokenExpiresAt    DateTime?
   webhookSubscribed Boolean  @default(false)
+  /// When true, any workspace can create campaigns on this account (Ongevia shared page).
+  isPlatformShared  Boolean  @default(false)
   connectedAt       DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -247,6 +249,7 @@ model InstagramAccount {
   followerSnapshots FollowerSnapshot[]
 
   @@index([workspaceId])
+  @@index([isPlatformShared])
 }
 
 model FollowerSnapshot {

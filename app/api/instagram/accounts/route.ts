@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentWorkspaceId } from "@/lib/auth";
+import { listInstagramAccountsForWorkspace } from "@/lib/instagram-accounts";
 import { prisma } from "@/lib/db/client";
 
 export const runtime = "nodejs";
 
-/**
- * The workspace's connected Instagram accounts — just enough for an account
- * selector. This is a single indexed query, unlike /api/dashboard/stats which
- * runs the full analytics aggregation. Pages that only need the account list
- * (e.g. the inbox) should use this so they aren't gated on heavy stats.
- */
 export async function GET() {
   const workspaceId = await getCurrentWorkspaceId();
   if (!workspaceId) {
@@ -19,17 +14,25 @@ export async function GET() {
     );
   }
 
-  const instagramAccounts = await prisma.instagramAccount.findMany({
-    where: { workspaceId },
-    orderBy: { connectedAt: "desc" },
-    select: { id: true, username: true, instagramId: true, name: true },
+  const accounts = await listInstagramAccountsForWorkspace(workspaceId);
+  const collaborate = await prisma.platformSetting.findUnique({
+    where: { key: `workspace:${workspaceId}:collaborate` },
   });
 
   return NextResponse.json({
     success: true,
     data: {
-      instagramAccounts,
-      selectedInstagramAccountId: instagramAccounts[0]?.id ?? null,
+      instagramAccounts: accounts.map((a) => ({
+        id: a.id,
+        username: a.username,
+        instagramId: a.instagramId,
+        name: a.name,
+        isPlatformShared: a.isPlatformShared,
+        ownedByWorkspace: a.workspaceId === workspaceId,
+      })),
+      selectedInstagramAccountId: accounts[0]?.id ?? null,
+      collaborating: Boolean(collaborate?.value),
+      collaborateAccountId: collaborate?.value ?? null,
     },
   });
 }

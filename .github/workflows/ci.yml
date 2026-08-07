@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -47,10 +47,14 @@ jobs:
           NEXTAUTH_SECRET: test-secret-for-ci-build
           CRON_SECRET: test-secret-for-ci-cron
           ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-          RESEND_API_KEY: re_test
-          EMAIL_FROM: "InstaReply <login@example.com>"
+            RESEND_API_KEY: re_test
+          EMAIL_FROM: "Ongevia <login@example.com>"
           META_GRAPH_API_VERSION: v25.0
           INSTAGRAM_APP_ID: test
           INSTAGRAM_APP_SECRET: test
           FACEBOOK_APP_SECRET: test
           WEBHOOK_VERIFY_TOKEN: test
+          BEEM_API_KEY: test
+          BEEM_SECRET_KEY: test
+          ADMIN_EMAIL: admin@ongevia.local
+          ADMIN_PASSWORD: test-password-ci

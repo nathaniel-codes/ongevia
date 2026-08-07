@@ -209,14 +209,51 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="mt-6 pt-4 border-t border-border flex gap-3">
+        <div className="mt-6 pt-4 border-t border-border flex flex-wrap gap-3">
           <a
             href="/api/instagram/connect"
             className="px-4 py-2 rounded text-sm font-medium transition-colors bg-accent text-white hover:bg-accent-hover"
           >
-            {accounts.length > 0 ? "Connect another account" : "Connect Instagram"}
+            {accounts.length > 0 ? "Connect another account" : "Connect my Instagram"}
           </a>
+          <button
+            type="button"
+            onClick={async () => {
+              setBusy("collaborate");
+              setMemberError(null);
+              const res = await fetch("/api/instagram/collaborate", { method: "POST" });
+              const payload = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                setMemberError(payload.error ?? "Collaborate unavailable");
+              } else {
+                window.location.reload();
+              }
+              setBusy(null);
+            }}
+            disabled={busy === "collaborate"}
+            className="px-4 py-2 rounded text-sm font-medium border border-border hover:bg-surface-hover disabled:opacity-50"
+          >
+            {busy === "collaborate" ? "Enabling…" : "Collaborate via Ongevia page"}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              setBusy("resubscribe");
+              await fetch("/api/instagram/resubscribe", { method: "POST" });
+              window.location.reload();
+            }}
+            disabled={busy === "resubscribe" || accounts.length === 0}
+            className="px-4 py-2 rounded text-sm font-medium border border-border hover:bg-surface-hover disabled:opacity-50"
+          >
+            {busy === "resubscribe" ? "Refreshing…" : "Refresh comment webhooks"}
+          </button>
         </div>
+        <p className="mt-3 text-xs text-muted">
+          <strong>Connect my Instagram</strong> sends DMs from your own page.{" "}
+          <strong>Collaborate via Ongevia page</strong> lets you run campaigns on the
+          shared @ongevia account (replies come from Ongevia). Admin must connect and
+          share that account first.
+        </p>
       </section>
 
       <section className="panel rounded p-4 sm:p-6">
