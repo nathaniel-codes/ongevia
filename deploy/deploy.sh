@@ -15,9 +15,18 @@ else
 fi
 
 ln -sfn /etc/ongevia/.env .env
+# Load KEY=VALUE without shell expansion (secrets may contain $).
 set -a
-# shellcheck disable=SC1091
-source /etc/ongevia/.env
+while IFS= read -r line || [ -n "$line" ]; do
+  case "$line" in
+    ''|\#*) continue ;;
+  esac
+  key="${line%%=*}"
+  val="${line#*=}"
+  if [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    export "$key=$val"
+  fi
+done < /etc/ongevia/.env
 set +a
 
 echo "[deploy] npm install…"
