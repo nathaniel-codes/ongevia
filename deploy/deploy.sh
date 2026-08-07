@@ -30,7 +30,7 @@ done < /etc/ongevia/.env
 set +a
 
 echo "[deploy] npm install…"
-npm install --omit=dev=false
+npm install
 npx prisma generate
 npx prisma migrate deploy
 npm run build
