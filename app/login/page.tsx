@@ -20,6 +20,7 @@ export default async function LoginPage({
     template?: string;
     error?: string;
     phone?: string;
+    name?: string;
     step?: string;
   }>;
 }) {
@@ -37,14 +38,21 @@ export default async function LoginPage({
 
   const step = params.step === "otp" ? "otp" : "phone";
   const phone = params.phone ?? "";
+  const name = params.name ?? "";
 
   async function requestOtp(formData: FormData) {
     "use server";
     const phoneValue = String(formData.get("phone") ?? "");
+    const nameValue = String(formData.get("name") ?? "").trim();
     const normalized = normalizePhone(phoneValue);
     if (!normalized) {
       redirect(
-        `/login?error=${encodeURIComponent("Enter a valid Tanzania phone number (e.g. 07XXXXXXXX).")}&phone=${encodeURIComponent(phoneValue)}`
+        `/login?error=${encodeURIComponent("Enter a valid Tanzania phone number (e.g. 07XXXXXXXX).")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
+      );
+    }
+    if (!nameValue || nameValue.length < 2) {
+      redirect(
+        `/login?error=${encodeURIComponent("Enter your name (at least 2 characters).")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
       );
     }
 
@@ -54,7 +62,7 @@ export default async function LoginPage({
     });
     if (existing?.isSuspended) {
       redirect(
-        `/login?error=${encodeURIComponent("This account is suspended.")}&phone=${encodeURIComponent(phoneValue)}`
+        `/login?error=${encodeURIComponent("This account is suspended.")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
       );
     }
 
@@ -66,7 +74,7 @@ export default async function LoginPage({
     });
     if (recent >= 3) {
       redirect(
-        `/login?error=${encodeURIComponent("Too many codes requested. Wait a few minutes.")}&phone=${encodeURIComponent(phoneValue)}`
+        `/login?error=${encodeURIComponent("Too many codes requested. Wait a few minutes.")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
       );
     }
 
@@ -82,7 +90,7 @@ export default async function LoginPage({
         meta: { phone: normalized, error: sms.error },
       });
       redirect(
-        `/login?error=${encodeURIComponent("Could not send SMS. Try again shortly.")}&phone=${encodeURIComponent(phoneValue)}`
+        `/login?error=${encodeURIComponent("Could not send SMS. Try again shortly.")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
       );
     }
 
@@ -93,18 +101,20 @@ export default async function LoginPage({
     });
 
     redirect(
-      `/login?step=otp&phone=${encodeURIComponent(phoneValue)}&callbackUrl=${encodeURIComponent(callbackUrl)}`
+      `/login?step=otp&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}&callbackUrl=${encodeURIComponent(callbackUrl)}`
     );
   }
 
   async function verifyOtp(formData: FormData) {
     "use server";
     const phoneValue = String(formData.get("phone") ?? "");
+    const nameValue = String(formData.get("name") ?? "").trim();
     const code = String(formData.get("code") ?? "");
     try {
       await signIn("phone-otp", {
         phone: phoneValue,
         code,
+        name: nameValue,
         redirectTo: callbackUrl,
       });
     } catch (err) {
@@ -117,7 +127,7 @@ export default async function LoginPage({
         throw err;
       }
       redirect(
-        `/login?step=otp&phone=${encodeURIComponent(phoneValue)}&error=${encodeURIComponent("Invalid or expired code")}&callbackUrl=${encodeURIComponent(callbackUrl)}`
+        `/login?step=otp&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}&error=${encodeURIComponent("Invalid or expired code")}&callbackUrl=${encodeURIComponent(callbackUrl)}`
       );
     }
   }
@@ -147,6 +157,7 @@ export default async function LoginPage({
           {step === "otp" ? (
             <form action={verifyOtp} className="space-y-5">
               <input type="hidden" name="phone" value={phone} />
+              <input type="hidden" name="name" value={name} />
               <p className="text-sm text-muted">
                 Enter the 6-digit code sent to{" "}
                 <span className="font-medium text-foreground">{phone}</span>
@@ -181,6 +192,22 @@ export default async function LoginPage({
             </form>
           ) : (
             <form action={requestOtp} className="space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="name" className="block text-sm font-medium">
+                  Your name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  minLength={2}
+                  maxLength={80}
+                  defaultValue={name}
+                  placeholder="e.g. Nathaniel"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                />
+              </div>
               <div className="space-y-2">
                 <label htmlFor="phone" className="block text-sm font-medium">
                   Phone number

@@ -1,10 +1,11 @@
 import Link from "next/link";
 
 interface PublicSiteHeaderProps {
-  active?: "home" | "templates";
+  active?: "home" | "templates" | "demo";
 }
 
 const navLinks = [
+  { label: "Demo", href: "/demo", key: "demo" },
   { label: "Templates", href: "/templates", key: "templates" },
   { label: "How it works", href: "/#how", key: "how" },
 ];

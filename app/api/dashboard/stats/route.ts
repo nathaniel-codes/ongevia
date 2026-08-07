@@ -135,10 +135,10 @@ export async function GET(request: NextRequest) {
         instagramAccount: { select: { username: true } },
       },
     }),
-    userId
+      userId
       ? prisma.user.findUnique({
           where: { id: userId },
-          select: { name: true, email: true },
+          select: { name: true, email: true, phone: true },
         })
       : Promise.resolve(null),
     // Distinct people who have interacted, counted as "contacts".
@@ -184,15 +184,22 @@ export async function GET(request: NextRequest) {
     }))
   );
 
-  const firstName =
-    user?.name?.trim().split(/\s+/)[0] ||
+  const rawName = user?.name?.trim() ?? "";
+  const looksLikePhone =
+    !rawName ||
+    /^\+?\d[\d\s-]{6,}$/.test(rawName) ||
+    (user?.phone != null && rawName === user.phone);
+  const displayName =
+    instagramAccounts[0]?.username ||
+    (!looksLikePhone ? rawName.split(/\s+/)[0] : null) ||
     user?.email?.split("@")[0] ||
     null;
 
   return NextResponse.json({
     success: true,
     data: {
-      userName: firstName,
+      userName: displayName,
+      instagramUsername: instagramAccounts[0]?.username ?? null,
       contactsCount: contactRows.length,
       workspace,
       instagramAccount,

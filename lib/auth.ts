@@ -19,10 +19,14 @@ export const authConfig = {
       credentials: {
         phone: { label: "Phone", type: "text" },
         code: { label: "OTP", type: "text" },
+        name: { label: "Name", type: "text" },
       },
       async authorize(credentials) {
         const phone = normalizePhone(String(credentials?.phone ?? ""));
         const code = String(credentials?.code ?? "");
+        const displayName = String(credentials?.name ?? "")
+          .trim()
+          .slice(0, 80);
         if (!phone || !code) return null;
 
         const verified = await verifyPhoneOtp(phone, code);
@@ -34,7 +38,7 @@ export const authConfig = {
             data: {
               phone,
               phoneVerified: new Date(),
-              name: phone,
+              name: displayName || null,
             },
           });
           await ensureWorkspaceForUser(user.id, phone);
@@ -44,14 +48,26 @@ export const authConfig = {
             action: "auth.signup",
             entityType: "User",
             entityId: user.id,
-            meta: { phone },
+            meta: { phone, name: displayName || null },
           });
         } else {
           if (user.isSuspended) return null;
+          const nameLooksLikePhone =
+            !user.name ||
+            user.name === user.phone ||
+            /^\+?\d[\d\s-]{6,}$/.test(user.name);
           await prisma.user.update({
             where: { id: user.id },
-            data: { phoneVerified: new Date() },
+            data: {
+              phoneVerified: new Date(),
+              ...(displayName && nameLooksLikePhone
+                ? { name: displayName }
+                : {}),
+            },
           });
+          if (displayName && nameLooksLikePhone) {
+            user = { ...user, name: displayName };
+          }
           await ensureWorkspaceForUser(user.id, phone);
           await ensureWallet(user.id);
           await logAction({

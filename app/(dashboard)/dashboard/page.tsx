@@ -13,6 +13,7 @@ import StatusBadge from "@/components/status-badge";
 
 interface DashboardStats {
   userName: string | null;
+  instagramUsername: string | null;
   contactsCount: number;
   totalAutomations: number;
   activeAutomations: number;
@@ -91,7 +92,11 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-            Hello, {stats?.userName ?? "there"}!
+            Hello,{" "}
+            {stats?.instagramUsername
+              ? `@${stats.instagramUsername}`
+              : stats?.userName ?? "there"}
+            !
           </h1>
           <p className="mt-1 text-sm text-muted">
             {connectedCount} connected{" "}
