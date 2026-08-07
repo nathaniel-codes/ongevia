@@ -30,7 +30,8 @@ done < /etc/ongevia/.env
 set +a
 
 echo "[deploy] npm install…"
-npm install
+# Build needs devDependencies (Tailwind/PostCSS). Keep them on the server.
+npm install --include=dev
 npx prisma generate
 npx prisma migrate deploy
 npm run build
