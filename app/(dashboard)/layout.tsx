@@ -15,9 +15,24 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      phone: true,
+      email: true,
+      isSuspended: true,
+    },
+  });
+
+  // Stale JWT after DB wipe / deleted account — clear cookies.
+  if (!user || user.isSuspended) {
+    redirect("/api/auth/invalidate");
+  }
+
   const workspace = await ensureWorkspaceForUser(
-    session.user.id,
-    session.user.email
+    user.id,
+    user.phone ?? user.email
   );
   const accounts = await prisma.instagramAccount.findMany({
     where: { workspaceId: workspace.id },

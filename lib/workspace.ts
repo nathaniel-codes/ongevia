@@ -71,6 +71,14 @@ export async function ensureWorkspaceForUser(
   userId: string,
   phoneOrEmail?: string | null
 ): Promise<Workspace> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (!user) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
   await acceptPendingInvitationsForUser(userId, phoneOrEmail);
 
   const existingMembership = await getWorkspaceMembership(userId);

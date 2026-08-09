@@ -151,7 +151,11 @@ export default async function LoginPage({
 
         <div className="panel rounded-xl p-8 shadow-sm">
           {params.error && (
-            <p className="mb-4 text-sm text-error">{params.error}</p>
+            <p className="mb-4 text-sm text-error">
+              {params.error === "session"
+                ? "Your session expired after a system reset. Sign in again."
+                : params.error}
+            </p>
           )}
 
           {step === "otp" ? (

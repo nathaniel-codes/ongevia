@@ -213,14 +213,46 @@ export const authConfig = {
         token.sub = user.id;
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { isSuperAdmin: true, phone: true, email: true },
+          select: {
+            isSuperAdmin: true,
+            phone: true,
+            email: true,
+            isSuspended: true,
+          },
         });
-        token.isSuperAdmin = dbUser?.isSuperAdmin ?? false;
-        token.phone = dbUser?.phone ?? null;
+        if (!dbUser || dbUser.isSuspended) {
+          return { error: "SessionInvalid" };
+        }
+        token.isSuperAdmin = dbUser.isSuperAdmin;
+        token.phone = dbUser.phone ?? null;
+        delete token.error;
+        return token;
       }
+
+      // Re-validate on later requests so wiped/deleted users don't keep a JWT.
+      if (token.sub) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: {
+            isSuperAdmin: true,
+            phone: true,
+            isSuspended: true,
+          },
+        });
+        if (!dbUser || dbUser.isSuspended) {
+          return { error: "SessionInvalid" };
+        }
+        token.isSuperAdmin = dbUser.isSuperAdmin;
+        token.phone = dbUser.phone ?? null;
+        delete token.error;
+      }
+
       return token;
     },
     async session({ session, token }) {
+      if (token.error || !token.sub) {
+        return { ...session, user: undefined as never, expires: session.expires };
+      }
       if (session.user && token.sub) {
         session.user.id = token.sub;
         session.user.isSuperAdmin = Boolean(token.isSuperAdmin);
@@ -275,10 +307,11 @@ export async function getCurrentWorkspaceId(): Promise<string | null> {
     where: { id: userId },
     select: { phone: true, email: true },
   });
+  if (!user) return null;
 
   const createdWorkspace = await ensureWorkspaceForUser(
     userId,
-    user?.phone ?? user?.email
+    user.phone ?? user.email
   );
   return createdWorkspace.id;
 }
