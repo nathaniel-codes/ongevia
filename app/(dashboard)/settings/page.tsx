@@ -289,6 +289,78 @@ export default function SettingsPage() {
       />
 
       <section className="panel rounded p-4 sm:p-6">
+        <h2 className="text-base font-semibold mb-4">Display name</h2>
+        <p className="mb-4 text-xs text-muted">
+          Names are unique across Ongevia. To use a name already taken on another
+          account (including after a team invite), pay 5,000 TZS from your wallet.
+        </p>
+        <form
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const nextName = String(
+              new FormData(form).get("displayName") ?? ""
+            ).trim();
+            setBusy("name");
+            setMemberError(null);
+            let res = await fetch("/api/account/profile", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: nextName }),
+            });
+            let payload = await res.json().catch(() => ({}));
+            if (!res.ok && payload.payToShareAvailable) {
+              if (
+                confirm(
+                  `${payload.error}\n\nPay 5,000 TZS to use this name on this account too?`
+                )
+              ) {
+                res = await fetch("/api/account/profile", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name: nextName, payToShare: true }),
+                });
+                payload = await res.json().catch(() => ({}));
+              }
+            }
+            if (!res.ok) {
+              setMemberError(payload.error ?? "Could not update name");
+            } else {
+              window.location.reload();
+            }
+            setBusy(null);
+          }}
+        >
+          <div className="flex-1">
+            <label className="text-sm font-medium" htmlFor="displayName">
+              Name
+            </label>
+            <input
+              id="displayName"
+              name="displayName"
+              required
+              minLength={2}
+              maxLength={80}
+              defaultValue=""
+              placeholder="Your public name"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={busy === "name"}
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+          >
+            {busy === "name" ? "Saving…" : "Save name"}
+          </button>
+        </form>
+        {memberError && (
+          <p className="mt-3 text-sm text-error">{memberError}</p>
+        )}
+      </section>
+
+      <section className="panel rounded p-4 sm:p-6">
         <h2 className="text-base font-semibold mb-6">Team</h2>
         <div className="space-y-3">
           {membersData?.members.map((member) => (

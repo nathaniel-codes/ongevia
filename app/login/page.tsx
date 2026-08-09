@@ -2,15 +2,37 @@ import { auth, signIn } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
-import { normalizePhone, createPhoneOtp } from "@/lib/phone";
+import {
+  normalizePhone,
+  createPhoneOtp,
+  getPhoneOtpSendGate,
+} from "@/lib/phone";
 import { sendBeemSms } from "@/lib/services/beem-sms";
 import { prisma } from "@/lib/db/client";
 import { logAction } from "@/lib/action-log";
+import { assertDisplayNameAvailable } from "@/lib/username";
 
 export const metadata = {
   title: "Login - Ongevia",
-  description: "Sign in with your phone to manage Instagram comment-to-DM campaigns.",
+  description:
+    "Sign in with your phone to manage Instagram comment-to-DM campaigns.",
 };
+
+function loginRedirect(params: {
+  error?: string;
+  phone?: string;
+  name?: string;
+  step?: string;
+  callbackUrl?: string;
+}) {
+  const q = new URLSearchParams();
+  if (params.error) q.set("error", params.error);
+  if (params.phone) q.set("phone", params.phone);
+  if (params.name) q.set("name", params.name);
+  if (params.step) q.set("step", params.step);
+  if (params.callbackUrl) q.set("callbackUrl", params.callbackUrl);
+  redirect(`/login?${q.toString()}`);
+}
 
 export default async function LoginPage({
   searchParams,
@@ -46,36 +68,55 @@ export default async function LoginPage({
     const nameValue = String(formData.get("name") ?? "").trim();
     const normalized = normalizePhone(phoneValue);
     if (!normalized) {
-      redirect(
-        `/login?error=${encodeURIComponent("Enter a valid Tanzania phone number (e.g. 07XXXXXXXX).")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
-      );
-    }
-    if (!nameValue || nameValue.length < 2) {
-      redirect(
-        `/login?error=${encodeURIComponent("Enter your name (at least 2 characters).")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
-      );
+      loginRedirect({
+        error: "Enter a valid Tanzania phone number (e.g. 07XXXXXXXX).",
+        phone: phoneValue,
+        name: nameValue,
+      });
+      return;
     }
 
     const existing = await prisma.user.findUnique({
       where: { phone: normalized },
-      select: { isSuspended: true },
+      select: { id: true, isSuspended: true, name: true },
     });
     if (existing?.isSuspended) {
-      redirect(
-        `/login?error=${encodeURIComponent("This account is suspended.")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
-      );
+      loginRedirect({
+        error: "This account is suspended.",
+        phone: phoneValue,
+        name: nameValue,
+      });
+      return;
     }
 
-    const recent = await prisma.phoneOtp.count({
-      where: {
-        phone: normalized,
-        createdAt: { gt: new Date(Date.now() - 10 * 60 * 1000) },
-      },
-    });
-    if (recent >= 3) {
-      redirect(
-        `/login?error=${encodeURIComponent("Too many codes requested. Wait a few minutes.")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
-      );
+    // New accounts must pick a unique display name before we spend SMS credit.
+    if (!existing) {
+      const nameCheck = await assertDisplayNameAvailable({ name: nameValue });
+      if (!nameCheck.ok) {
+        loginRedirect({
+          error: nameCheck.error,
+          phone: phoneValue,
+          name: nameValue,
+        });
+        return;
+      }
+    } else if (!nameValue || nameValue.length < 2) {
+      loginRedirect({
+        error: "Enter your name (at least 2 characters).",
+        phone: phoneValue,
+        name: nameValue,
+      });
+      return;
+    }
+
+    const gate = await getPhoneOtpSendGate(normalized);
+    if (!gate.ok) {
+      loginRedirect({
+        error: gate.error,
+        phone: phoneValue,
+        name: nameValue,
+      });
+      return;
     }
 
     const code = await createPhoneOtp(normalized);
@@ -89,9 +130,12 @@ export default async function LoginPage({
         action: "auth.otp_sms_failed",
         meta: { phone: normalized, error: sms.error },
       });
-      redirect(
-        `/login?error=${encodeURIComponent("Could not send SMS. Try again shortly.")}&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}`
-      );
+      loginRedirect({
+        error: "Could not send SMS. Try again shortly.",
+        phone: phoneValue,
+        name: nameValue,
+      });
+      return;
     }
 
     await logAction({
@@ -100,9 +144,12 @@ export default async function LoginPage({
       meta: { phone: normalized },
     });
 
-    redirect(
-      `/login?step=otp&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}&callbackUrl=${encodeURIComponent(callbackUrl)}`
-    );
+    loginRedirect({
+      step: "otp",
+      phone: phoneValue,
+      name: nameValue,
+      callbackUrl,
+    });
   }
 
   async function verifyOtp(formData: FormData) {
@@ -110,6 +157,37 @@ export default async function LoginPage({
     const phoneValue = String(formData.get("phone") ?? "");
     const nameValue = String(formData.get("name") ?? "").trim();
     const code = String(formData.get("code") ?? "");
+    const normalized = normalizePhone(phoneValue);
+
+    if (!normalized) {
+      loginRedirect({
+        step: "otp",
+        phone: phoneValue,
+        name: nameValue,
+        error: "Invalid phone number.",
+        callbackUrl,
+      });
+      return;
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { phone: normalized },
+      select: { id: true },
+    });
+    if (!existing) {
+      const nameCheck = await assertDisplayNameAvailable({ name: nameValue });
+      if (!nameCheck.ok) {
+        loginRedirect({
+          step: "otp",
+          phone: phoneValue,
+          name: nameValue,
+          error: nameCheck.error,
+          callbackUrl,
+        });
+        return;
+      }
+    }
+
     try {
       await signIn("phone-otp", {
         phone: phoneValue,
@@ -126,9 +204,14 @@ export default async function LoginPage({
       ) {
         throw err;
       }
-      redirect(
-        `/login?step=otp&phone=${encodeURIComponent(phoneValue)}&name=${encodeURIComponent(nameValue)}&error=${encodeURIComponent("Invalid or expired code")}&callbackUrl=${encodeURIComponent(callbackUrl)}`
-      );
+      loginRedirect({
+        step: "otp",
+        phone: phoneValue,
+        name: nameValue,
+        error:
+          "Could not sign in. Check the code, or request a new one and try again.",
+        callbackUrl,
+      });
     }
   }
 
@@ -177,7 +260,8 @@ export default async function LoginPage({
                   inputMode="numeric"
                   pattern="[0-9]{6}"
                   required
-                  maxLength={6}
+                  maxLength={8}
+                  autoComplete="one-time-code"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm tracking-widest"
                 />
               </div>
@@ -188,10 +272,10 @@ export default async function LoginPage({
                 Verify & sign in
               </button>
               <Link
-                href="/login"
+                href={`/login?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`}
                 className="block text-center text-sm text-muted hover:text-foreground"
               >
-                Use a different number
+                Resend or use a different number
               </Link>
             </form>
           ) : (
@@ -211,6 +295,10 @@ export default async function LoginPage({
                   placeholder="e.g. Nathaniel"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
+                <p className="text-xs text-muted">
+                  Names are unique. Reusing someone else&apos;s name costs{" "}
+                  5,000 TZS from Settings after you have credits.
+                </p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="phone" className="block text-sm font-medium">

@@ -24,24 +24,31 @@ export async function ensureWallet(
 
   const bonus = options?.grantSignupBonus ? await getSignupBonusCredits() : 0;
 
-  return prisma.$transaction(async (tx) => {
-    const wallet = await tx.wallet.create({
-      data: { userId, balance: bonus },
-    });
-    if (bonus > 0) {
-      await tx.walletTransaction.create({
-        data: {
-          walletId: wallet.id,
-          amount: bonus,
-          balanceAfter: wallet.balance,
-          type: "ADMIN_GRANT",
-          reference: "signup_bonus",
-          note: `Welcome bonus — ${bonus} TZS credits`,
-        },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const wallet = await tx.wallet.create({
+        data: { userId, balance: bonus },
       });
-    }
-    return wallet;
-  });
+      if (bonus > 0) {
+        await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            amount: bonus,
+            balanceAfter: wallet.balance,
+            type: "ADMIN_GRANT",
+            reference: "signup_bonus",
+            note: `Welcome bonus — ${bonus} TZS credits`,
+          },
+        });
+      }
+      return wallet;
+    });
+  } catch (err) {
+    // Race: another request created the wallet first
+    const again = await prisma.wallet.findUnique({ where: { userId } });
+    if (again) return again;
+    throw err;
+  }
 }
 
 export async function getCreditsPer1000Tzs(): Promise<number> {

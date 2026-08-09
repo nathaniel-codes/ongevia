@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
-import { normalizePhone, createPhoneOtp } from "@/lib/phone";
+import {
+  normalizePhone,
+  createPhoneOtp,
+  getPhoneOtpSendGate,
+} from "@/lib/phone";
 import { sendBeemSms } from "@/lib/services/beem-sms";
 import { prisma } from "@/lib/db/client";
 import { logAction } from "@/lib/action-log";
+import { assertDisplayNameAvailable } from "@/lib/username";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const phone = normalizePhone(String(body?.phone ?? ""));
+  const name = String(body?.name ?? "").trim();
 
   if (!phone) {
     return NextResponse.json(
@@ -26,16 +32,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // Rate-limit: max 3 OTPs per phone per 10 minutes
-  const recent = await prisma.phoneOtp.count({
-    where: {
-      phone,
-      createdAt: { gt: new Date(Date.now() - 10 * 60 * 1000) },
-    },
-  });
-  if (recent >= 3) {
+  if (!existing) {
+    const nameCheck = await assertDisplayNameAvailable({ name });
+    if (!nameCheck.ok) {
+      return NextResponse.json({ error: nameCheck.error }, { status: 409 });
+    }
+  }
+
+  const gate = await getPhoneOtpSendGate(phone);
+  if (!gate.ok) {
     return NextResponse.json(
-      { error: "Too many codes requested. Wait a few minutes." },
+      { error: gate.error, retryAfterSec: gate.retryAfterSec },
       { status: 429 }
     );
   }

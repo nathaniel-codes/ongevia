@@ -5,8 +5,13 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/client";
 import { ensureWorkspaceForUser, getPrimaryWorkspace } from "@/lib/workspace";
 import { ensureWallet } from "@/lib/wallet";
-import { normalizePhone, verifyPhoneOtp } from "@/lib/phone";
+import { normalizePhone, verifyPhoneOtp, consumePhoneOtp } from "@/lib/phone";
 import { logAction } from "@/lib/action-log";
+import {
+  assertDisplayNameAvailable,
+  nameKeyFromDisplayName,
+  normalizeDisplayName,
+} from "@/lib/username";
 
 type AdapterPrismaClient = Parameters<typeof PrismaAdapter>[0];
 
@@ -24,9 +29,9 @@ export const authConfig = {
       async authorize(credentials) {
         const phone = normalizePhone(String(credentials?.phone ?? ""));
         const code = String(credentials?.code ?? "");
-        const displayName = String(credentials?.name ?? "")
-          .trim()
-          .slice(0, 80);
+        const displayName = normalizeDisplayName(
+          String(credentials?.name ?? "")
+        );
         if (!phone || !code) return null;
 
         const verified = await verifyPhoneOtp(phone, code);
@@ -34,59 +39,99 @@ export const authConfig = {
 
         let user = await prisma.user.findUnique({ where: { phone } });
         if (!user) {
-          user = await prisma.user.create({
-            data: {
-              phone,
-              phoneVerified: new Date(),
-              name: displayName || null,
-            },
+          const nameCheck = await assertDisplayNameAvailable({
+            name: displayName,
           });
-          const workspace = await ensureWorkspaceForUser(user.id, phone);
-          await ensureWallet(user.id, { grantSignupBonus: true });
-          // New users get collaborate mode on by default (shared @ongeviadotcom).
-          await prisma.platformSetting.upsert({
-            where: { key: `workspace:${workspace.id}:collaborate` },
-            create: {
-              key: `workspace:${workspace.id}:collaborate`,
-              value: "1",
-            },
-            update: { value: "1" },
-          });
-          await logAction({
-            actorUserId: user.id,
-            action: "auth.signup",
-            entityType: "User",
-            entityId: user.id,
-            meta: { phone, name: displayName || null },
-          });
+          if (!nameCheck.ok) {
+            // Leave OTP reusable — user can pick another name.
+            return null;
+          }
+
+          try {
+            user = await prisma.user.create({
+              data: {
+                phone,
+                phoneVerified: new Date(),
+                name: nameCheck.name,
+                nameKey: nameCheck.nameKey,
+              },
+            });
+            const workspace = await ensureWorkspaceForUser(user.id, phone);
+            await ensureWallet(user.id, { grantSignupBonus: true });
+            await prisma.platformSetting.upsert({
+              where: { key: `workspace:${workspace.id}:collaborate` },
+              create: {
+                key: `workspace:${workspace.id}:collaborate`,
+                value: "1",
+              },
+              update: { value: "1" },
+            });
+            await logAction({
+              actorUserId: user.id,
+              action: "auth.signup",
+              entityType: "User",
+              entityId: user.id,
+              meta: { phone, name: nameCheck.name },
+            });
+          } catch (err) {
+            console.error("[auth.signup]", err);
+            return null;
+          }
         } else {
           if (user.isSuspended) return null;
           const nameLooksLikePhone =
             !user.name ||
             user.name === user.phone ||
             /^\+?\d[\d\s-]{6,}$/.test(user.name);
-          await prisma.user.update({
-            where: { id: user.id },
-            data: {
-              phoneVerified: new Date(),
-              ...(displayName && nameLooksLikePhone
-                ? { name: displayName }
-                : {}),
-            },
-          });
-          if (displayName && nameLooksLikePhone) {
-            user = { ...user, name: displayName };
+          try {
+            if (displayName && nameLooksLikePhone) {
+              const nameCheck = await assertDisplayNameAvailable({
+                name: displayName,
+                userId: user.id,
+              });
+              if (nameCheck.ok) {
+                user = await prisma.user.update({
+                  where: { id: user.id },
+                  data: {
+                    phoneVerified: new Date(),
+                    name: nameCheck.name,
+                    nameKey: nameCheck.nameKey,
+                  },
+                });
+              } else {
+                await prisma.user.update({
+                  where: { id: user.id },
+                  data: { phoneVerified: new Date() },
+                });
+              }
+            } else {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  phoneVerified: new Date(),
+                  ...(user.name && !user.nameKey
+                    ? { nameKey: nameKeyFromDisplayName(user.name) }
+                    : {}),
+                },
+              });
+            }
+            await ensureWorkspaceForUser(user.id, phone);
+            // Complete wallets for users stuck mid-signup before enum fix.
+            await ensureWallet(user.id, { grantSignupBonus: true });
+            await logAction({
+              actorUserId: user.id,
+              action: "auth.login",
+              entityType: "User",
+              entityId: user.id,
+              meta: { phone },
+            });
+          } catch (err) {
+            console.error("[auth.login]", err);
+            return null;
           }
-          await ensureWorkspaceForUser(user.id, phone);
-          await ensureWallet(user.id);
-          await logAction({
-            actorUserId: user.id,
-            action: "auth.login",
-            entityType: "User",
-            entityId: user.id,
-            meta: { phone },
-          });
         }
+
+        await consumePhoneOtp(verified.otpId);
 
         return {
           id: user.id,
