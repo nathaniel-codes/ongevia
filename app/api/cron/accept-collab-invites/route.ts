@@ -38,12 +38,22 @@ export async function GET(request: NextRequest) {
       platform.instagramId
     );
   } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Failed to list collaboration invites";
+    // Instagram Login tokens often lack collaboration_invites; treat as soft skip.
+    if (/nonexisting field|collaboration_invites/i.test(message)) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          accepted: 0,
+          skipped: "collaboration_invites unavailable on this token type",
+          hint: "Accept invites in the Instagram app as @ongeviadotcom",
+        },
+      });
+    }
     return NextResponse.json({
       success: false,
-      error:
-        err instanceof Error
-          ? err.message
-          : "Failed to list collaboration invites",
+      error: message,
     });
   }
 
@@ -85,6 +95,10 @@ export async function GET(request: NextRequest) {
       accepted: accepted.length,
       mediaIds: accepted,
       errors,
+      note:
+        errors.length > 0
+          ? "If Meta returns nonexisting field, accept invites in the Instagram app on @ongeviadotcom for now."
+          : null,
     },
   });
 }

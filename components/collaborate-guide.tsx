@@ -9,22 +9,34 @@ const steps = [
   {
     n: "01",
     title: "Turn on Collaborate",
-    body: "One click below. Campaigns will send replies from @" + PLATFORM_HANDLE + " — you never share your Instagram login with us.",
+    body:
+      "One click below. Replies send from @" +
+      PLATFORM_HANDLE +
+      " — you never OAuth your Instagram with us.",
   },
   {
     n: "02",
-    title: "Invite @" + PLATFORM_HANDLE + " on your post",
-    body: "In Instagram, open your Reel or post → Edit → Collaborators → add @" + PLATFORM_HANDLE + ". We auto-accept invites within a couple of minutes.",
+    title: "Invite @" + PLATFORM_HANDLE + " on your Reel",
+    body:
+      "Instagram → your post → Collaborators → add @" +
+      PLATFORM_HANDLE +
+      ". Then open Instagram on the Ongevia phone and accept the invite (bell / notifications). After accept, comments are visible to Ongevia.",
   },
   {
     n: "03",
     title: "Prove it’s yours with a DM",
-    body: "Paste the post link below, copy the connect code, and DM it to @" + PLATFORM_HANDLE + ". That locks the post to your workspace so nobody else can automate it.",
+    body:
+      "Paste the post link below, copy the connect code, and DM it to @" +
+      PLATFORM_HANDLE +
+      ". That locks the post to your workspace.",
   },
   {
     n: "04",
     title: "Build your campaign",
-    body: "Create a campaign on the shared Ongevia account, pick your verified post, set keywords and the DM. Comments and replies run through @" + PLATFORM_HANDLE + ".",
+    body:
+      "Create a campaign on the shared Ongevia account, pick your verified post, set keywords and the DM. @" +
+      PLATFORM_HANDLE +
+      " handles comments and private replies.",
   },
 ];
 
@@ -68,9 +80,9 @@ export default function CollaborateGuide({
           connecting Instagram
         </h2>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-teal-50/85">
-          Tag @{handle} as a collaborator on your Reel. We read comments and send
-          private replies from the Ongevia account. Or connect your own Instagram
-          above if you prefer replies from your page.
+          Tag @{handle} as a collaborator on your Reel, accept on the Ongevia
+          Instagram, then prove ownership with a DM. Or connect your own Instagram
+          above if you want replies from your page.
         </p>
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
