@@ -10,7 +10,6 @@ import {
 import { sendBeemSms } from "@/lib/services/beem-sms";
 import { prisma } from "@/lib/db/client";
 import { logAction } from "@/lib/action-log";
-import { assertDisplayNameAvailable } from "@/lib/username";
 
 export const metadata = {
   title: "Login - Ongevia",
@@ -75,34 +74,22 @@ export default async function LoginPage({
       });
       return;
     }
-
-    const existing = await prisma.user.findUnique({
-      where: { phone: normalized },
-      select: { id: true, isSuspended: true, name: true },
-    });
-    if (existing?.isSuspended) {
+    if (!nameValue || nameValue.length < 2) {
       loginRedirect({
-        error: "This account is suspended.",
+        error: "Enter your name (at least 2 characters).",
         phone: phoneValue,
         name: nameValue,
       });
       return;
     }
 
-    // New accounts must pick a unique display name before we spend SMS credit.
-    if (!existing) {
-      const nameCheck = await assertDisplayNameAvailable({ name: nameValue });
-      if (!nameCheck.ok) {
-        loginRedirect({
-          error: nameCheck.error,
-          phone: phoneValue,
-          name: nameValue,
-        });
-        return;
-      }
-    } else if (!nameValue || nameValue.length < 2) {
+    const existing = await prisma.user.findUnique({
+      where: { phone: normalized },
+      select: { isSuspended: true },
+    });
+    if (existing?.isSuspended) {
       loginRedirect({
-        error: "Enter your name (at least 2 characters).",
+        error: "This account is suspended.",
         phone: phoneValue,
         name: nameValue,
       });
@@ -157,36 +144,6 @@ export default async function LoginPage({
     const phoneValue = String(formData.get("phone") ?? "");
     const nameValue = String(formData.get("name") ?? "").trim();
     const code = String(formData.get("code") ?? "");
-    const normalized = normalizePhone(phoneValue);
-
-    if (!normalized) {
-      loginRedirect({
-        step: "otp",
-        phone: phoneValue,
-        name: nameValue,
-        error: "Invalid phone number.",
-        callbackUrl,
-      });
-      return;
-    }
-
-    const existing = await prisma.user.findUnique({
-      where: { phone: normalized },
-      select: { id: true },
-    });
-    if (!existing) {
-      const nameCheck = await assertDisplayNameAvailable({ name: nameValue });
-      if (!nameCheck.ok) {
-        loginRedirect({
-          step: "otp",
-          phone: phoneValue,
-          name: nameValue,
-          error: nameCheck.error,
-          callbackUrl,
-        });
-        return;
-      }
-    }
 
     try {
       await signIn("phone-otp", {
@@ -295,10 +252,6 @@ export default async function LoginPage({
                   placeholder="e.g. Nathaniel"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 />
-                <p className="text-xs text-muted">
-                  Names are unique. Reusing someone else&apos;s name costs{" "}
-                  5,000 TZS from Settings after you have credits.
-                </p>
               </div>
               <div className="space-y-2">
                 <label htmlFor="phone" className="block text-sm font-medium">

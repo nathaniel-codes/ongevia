@@ -1,6 +1,9 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+
+const IG_SHARE_COST_TZS = 5000;
 
 type Tone = "error" | "warning" | "success";
 
@@ -29,17 +32,15 @@ const MESSAGES: Record<string, { tone: Tone; title: string; detail: string }> = 
     detail:
       "Only workspace owners and admins can connect an Instagram account.",
   },
-  already_connected: {
-    tone: "warning",
-    title: "Account already connected",
-    detail:
-      "That Instagram account is connected to another workspace. Disconnect it there first, or connect a different account.",
-  },
 };
 
 export function InstagramConnectNotice() {
   const searchParams = useSearchParams();
   const status = searchParams.get("instagram");
+  const username = (searchParams.get("username") ?? "").replace(/^@/, "");
+  const [busy, setBusy] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
 
   if (!status) return null;
 
@@ -90,6 +91,61 @@ export function InstagramConnectNotice() {
           <p className="mt-2 font-mono text-xs break-words opacity-80">
             {reason}
           </p>
+        )}
+      </Notice>
+    );
+  }
+
+  if (status === "already_connected" || status === "username_taken") {
+    const handle = username ? `@${username}` : "That Instagram account";
+    return (
+      <Notice tone="warning" title="Instagram username already in use">
+        <p>
+          {handle} is already connected on another Ongevia workspace. Instagram
+          usernames are unique — pay {IG_SHARE_COST_TZS.toLocaleString()} TZS to
+          unlock it for this workspace, then connect again.
+        </p>
+        {unlocked ? (
+          <p className="mt-3 font-medium">
+            Unlocked. Click Connect Instagram again to finish.
+          </p>
+        ) : username ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setUnlockError(null);
+                const res = await fetch("/api/instagram/share-username", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ username }),
+                });
+                const payload = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  setUnlockError(payload.error ?? "Payment failed");
+                } else {
+                  setUnlocked(true);
+                }
+                setBusy(false);
+              }}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+            >
+              {busy
+                ? "Processing…"
+                : `Pay ${IG_SHARE_COST_TZS.toLocaleString()} TZS to unlock`}
+            </button>
+            <a
+              href="/wallet"
+              className="text-sm font-medium underline-offset-2 hover:underline"
+            >
+              Top up wallet
+            </a>
+          </div>
+        ) : null}
+        {unlockError && (
+          <p className="mt-2 text-sm font-medium">{unlockError}</p>
         )}
       </Notice>
     );

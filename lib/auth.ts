@@ -7,11 +7,6 @@ import { ensureWorkspaceForUser, getPrimaryWorkspace } from "@/lib/workspace";
 import { ensureWallet } from "@/lib/wallet";
 import { normalizePhone, verifyPhoneOtp, consumePhoneOtp } from "@/lib/phone";
 import { logAction } from "@/lib/action-log";
-import {
-  assertDisplayNameAvailable,
-  nameKeyFromDisplayName,
-  normalizeDisplayName,
-} from "@/lib/username";
 
 type AdapterPrismaClient = Parameters<typeof PrismaAdapter>[0];
 
@@ -29,9 +24,10 @@ export const authConfig = {
       async authorize(credentials) {
         const phone = normalizePhone(String(credentials?.phone ?? ""));
         const code = String(credentials?.code ?? "");
-        const displayName = normalizeDisplayName(
-          String(credentials?.name ?? "")
-        );
+        const displayName = String(credentials?.name ?? "")
+          .trim()
+          .replace(/\s+/g, " ")
+          .slice(0, 80);
         if (!phone || !code) return null;
 
         const verified = await verifyPhoneOtp(phone, code);
@@ -39,21 +35,12 @@ export const authConfig = {
 
         let user = await prisma.user.findUnique({ where: { phone } });
         if (!user) {
-          const nameCheck = await assertDisplayNameAvailable({
-            name: displayName,
-          });
-          if (!nameCheck.ok) {
-            // Leave OTP reusable — user can pick another name.
-            return null;
-          }
-
           try {
             user = await prisma.user.create({
               data: {
                 phone,
                 phoneVerified: new Date(),
-                name: nameCheck.name,
-                nameKey: nameCheck.nameKey,
+                name: displayName || null,
               },
             });
             const workspace = await ensureWorkspaceForUser(user.id, phone);
@@ -71,7 +58,7 @@ export const authConfig = {
               action: "auth.signup",
               entityType: "User",
               entityId: user.id,
-              meta: { phone, name: nameCheck.name },
+              meta: { phone, name: displayName || null },
             });
           } catch (err) {
             console.error("[auth.signup]", err);
@@ -85,38 +72,20 @@ export const authConfig = {
             /^\+?\d[\d\s-]{6,}$/.test(user.name);
           try {
             if (displayName && nameLooksLikePhone) {
-              const nameCheck = await assertDisplayNameAvailable({
-                name: displayName,
-                userId: user.id,
-              });
-              if (nameCheck.ok) {
-                user = await prisma.user.update({
-                  where: { id: user.id },
-                  data: {
-                    phoneVerified: new Date(),
-                    name: nameCheck.name,
-                    nameKey: nameCheck.nameKey,
-                  },
-                });
-              } else {
-                await prisma.user.update({
-                  where: { id: user.id },
-                  data: { phoneVerified: new Date() },
-                });
-              }
-            } else {
-              await prisma.user.update({
+              user = await prisma.user.update({
                 where: { id: user.id },
                 data: {
                   phoneVerified: new Date(),
-                  ...(user.name && !user.nameKey
-                    ? { nameKey: nameKeyFromDisplayName(user.name) }
-                    : {}),
+                  name: displayName,
                 },
+              });
+            } else {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { phoneVerified: new Date() },
               });
             }
             await ensureWorkspaceForUser(user.id, phone);
-            // Complete wallets for users stuck mid-signup before enum fix.
             await ensureWallet(user.id, { grantSignupBonus: true });
             await logAction({
               actorUserId: user.id,

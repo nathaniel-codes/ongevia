@@ -12,8 +12,6 @@ datasource db {
 model User {
   id            String    @id @default(cuid())
   name          String?
-  /// Lowercased key for display-name uniqueness checks (not unique — paid shares allowed).
-  nameKey       String?
   email         String?   @unique
   emailVerified DateTime?
   phone         String?   @unique
@@ -34,8 +32,6 @@ model User {
   paymentOrders     PaymentOrder[]
   actionLogs        ActionLog[]       @relation("ActionLogActor")
   impersonationLogs ActionLog[]       @relation("ActionLogImpersonated")
-
-  @@index([nameKey])
 }
 
 model Account {

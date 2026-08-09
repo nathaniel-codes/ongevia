@@ -7,6 +7,9 @@ const { mockPrisma } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       findFirst: vi.fn(),
     },
+    platformSetting: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -44,7 +47,10 @@ describe("agency workspace helpers", () => {
   it("blocks accounts already connected to another workspace", async () => {
     mockPrisma.instagramAccount.findUnique.mockResolvedValue({
       workspaceId: "workspace_other",
+      isPlatformShared: false,
+      username: "brand_ig",
     });
+    mockPrisma.platformSetting.findUnique.mockResolvedValue(null);
 
     await expect(
       canConnectInstagramAccount({
@@ -54,11 +60,13 @@ describe("agency workspace helpers", () => {
     ).resolves.toMatchObject({
       allowed: false,
       reason: "already_connected",
+      username: "brand_ig",
     });
   });
 
   it("allows connecting additional accounts with no plan limit", async () => {
     mockPrisma.instagramAccount.findUnique.mockResolvedValue(null);
+    mockPrisma.instagramAccount.findFirst.mockResolvedValue(null);
 
     await expect(
       canConnectInstagramAccount({

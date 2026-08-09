@@ -58,11 +58,13 @@ export async function GET(request: NextRequest) {
     const connection = await canConnectInstagramAccount({
       workspaceId: state.workspaceId,
       instagramId,
+      username: userInfo.username,
     });
 
     if (!connection.allowed) {
+      const u = encodeURIComponent(connection.username ?? userInfo.username);
       return NextResponse.redirect(
-        `${baseUrl}/settings?instagram=already_connected`
+        `${baseUrl}/settings?instagram=${connection.reason}&username=${u}`
       );
     }
 

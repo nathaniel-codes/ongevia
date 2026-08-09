@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hashOtp, normalizeOtpCode, normalizePhone } from "../lib/phone";
-import {
-  nameKeyFromDisplayName,
-  normalizeDisplayName,
-} from "../lib/username";
+import { normalizeIgUsername } from "../lib/instagram-username";
 
 describe("normalizePhone", () => {
   it("normalizes local TZ numbers", () => {
@@ -24,9 +21,8 @@ describe("hashOtp", () => {
   });
 });
 
-describe("display name", () => {
-  it("normalizes name keys", () => {
-    expect(normalizeDisplayName("  Nate  Codes ")).toBe("Nate Codes");
-    expect(nameKeyFromDisplayName("Nate")).toBe("nate");
+describe("normalizeIgUsername", () => {
+  it("strips @ and lowercases", () => {
+    expect(normalizeIgUsername("@Nate_Codes")).toBe("nate_codes");
   });
 });
