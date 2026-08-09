@@ -7,6 +7,7 @@ import {
   creditsForAmount,
   ensureWallet,
   getCreditsPer1000Tzs,
+  getDmCreditCost,
 } from "@/lib/wallet";
 import { swahiliesMoneyPush } from "@/lib/services/swahilies-payment";
 import { logAction } from "@/lib/action-log";
@@ -32,7 +33,16 @@ export async function GET() {
   const transactions = await prisma.walletTransaction.findMany({
     where: { walletId: wallet.id },
     orderBy: { createdAt: "desc" },
-    take: 30,
+    take: 100,
+    select: {
+      id: true,
+      amount: true,
+      balanceAfter: true,
+      type: true,
+      reference: true,
+      note: true,
+      createdAt: true,
+    },
   });
 
   return NextResponse.json({
@@ -42,6 +52,7 @@ export async function GET() {
       orders,
       transactions,
       creditsPer1000: await getCreditsPer1000Tzs(),
+      dmCreditCost: await getDmCreditCost(),
     },
   });
 }
