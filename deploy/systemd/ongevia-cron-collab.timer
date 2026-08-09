@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Ongevia collab-invite accept every 2 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+Unit=ongevia-cron-collab.service
+
+[Install]
+WantedBy=timers.target

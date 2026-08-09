@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId, getCurrentWorkspaceId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
+import { listInstagramAccountsForWorkspace } from "@/lib/instagram-accounts";
 import {
   calculateCtr,
   normalizeTopKeywords,
@@ -35,8 +36,7 @@ export async function GET(request: NextRequest) {
 
   const [
     workspace,
-    instagramAccount,
-    instagramAccounts,
+    listedAccounts,
     totalAutomations,
     activeAutomations,
     dmsSentToday,
@@ -58,29 +58,7 @@ export async function GET(request: NextRequest) {
         dmsSentThisPeriod: true,
       },
     }),
-    prisma.instagramAccount.findFirst({
-      where: { workspaceId },
-      orderBy: { connectedAt: "desc" },
-      select: {
-        id: true,
-        username: true,
-        instagramId: true,
-        tokenExpiresAt: true,
-        webhookSubscribed: true,
-      },
-    }),
-    prisma.instagramAccount.findMany({
-      where: { workspaceId },
-      orderBy: { connectedAt: "desc" },
-      select: {
-        id: true,
-        username: true,
-        instagramId: true,
-        name: true,
-        tokenExpiresAt: true,
-        webhookSubscribed: true,
-      },
-    }),
+    listInstagramAccountsForWorkspace(workspaceId),
     prisma.automation.count({ where: { workspaceId, ...accountFilter } }),
     prisma.automation.count({
       where: { workspaceId, isActive: true, ...accountFilter },
@@ -148,6 +126,22 @@ export async function GET(request: NextRequest) {
       select: { commenterId: true },
     }),
   ]);
+
+  const instagramAccounts = listedAccounts.map((account) => ({
+    id: account.id,
+    username: account.username,
+    instagramId: account.instagramId,
+    name: account.name,
+    tokenExpiresAt: account.tokenExpiresAt,
+    webhookSubscribed: account.webhookSubscribed,
+    isPlatformShared: account.isPlatformShared,
+  }));
+  const instagramAccount =
+    (selectedAccountId
+      ? instagramAccounts.find((a) => a.id === selectedAccountId)
+      : null) ??
+    instagramAccounts[0] ??
+    null;
 
   const dailyDMs: { date: string; count: number }[] = [];
   for (let i = 6; i >= 0; i--) {

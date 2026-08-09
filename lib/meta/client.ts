@@ -605,6 +605,43 @@ export async function getAllUserMedia(
   return results.slice(0, max);
 }
 
+/** Fetch a single media object the token can access (owner's media). */
+export async function getMediaById(
+  accessToken: string,
+  mediaId: string
+): Promise<InstagramMedia> {
+  const url = new URL(`${instagramGraphBase()}/${mediaId}`);
+  url.searchParams.set("fields", MEDIA_FIELDS);
+  url.searchParams.set("access_token", accessToken);
+  const response = await fetch(url.toString());
+  return handleResponse<InstagramMedia>(response);
+}
+
+/**
+ * Find a messaging participant IGSID by Instagram username among recent
+ * conversations. Returns null when no open thread exists (user must DM first).
+ */
+export async function findMessagingUserByUsername(
+  accessToken: string,
+  igUserId: string,
+  username: string
+): Promise<{ id: string; username?: string } | null> {
+  const needle = username.trim().replace(/^@/, "").toLowerCase();
+  if (!needle) return null;
+
+  const conversations = await getConversations(accessToken, igUserId);
+  for (const convo of conversations) {
+    for (const participant of convo.participants?.data ?? []) {
+      if (participant.id === igUserId) continue;
+      const handle = (participant.username ?? "").replace(/^@/, "").toLowerCase();
+      if (handle && handle === needle) {
+        return { id: participant.id, username: participant.username };
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Fetch per-media insight metrics (views, reach, saved, shares, etc.).
  *
@@ -756,6 +793,80 @@ export async function subscribeInstagramAccountToWebhooks(
   );
 
   return handleResponse(response);
+}
+
+export interface CollaborationInvite {
+  id: string;
+  media_id?: string;
+  media_owner_username?: string;
+  caption?: string;
+  media_url?: string;
+  permalink?: string;
+}
+
+/** Pending Instagram post collaboration invites for the platform account. */
+export async function getCollaborationInvites(
+  accessToken: string,
+  igUserId: string
+): Promise<CollaborationInvite[]> {
+  const url = new URL(`${instagramGraphBase()}/${igUserId}/collaboration_invites`);
+  url.searchParams.set(
+    "fields",
+    "id,media_id,media_owner_username,caption,media_url,permalink"
+  );
+  url.searchParams.set("access_token", accessToken);
+  const response = await fetch(url.toString());
+  const data = await handleResponse<{ data?: CollaborationInvite[] }>(response);
+  return data.data ?? [];
+}
+
+/** Accept or decline a collaboration invite by media id. */
+export async function respondToCollaborationInvite(
+  accessToken: string,
+  igUserId: string,
+  mediaId: string,
+  accept: boolean
+): Promise<{ success: boolean }> {
+  const response = await fetch(
+    `${instagramGraphBase()}/${igUserId}/collaboration_invites`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        media_id: mediaId,
+        accept,
+      }),
+    }
+  );
+  return handleResponse(response);
+}
+
+/** Media where this account is an accepted collaborator. */
+export async function getCollaborativeMedia(
+  accessToken: string,
+  igUserId: string,
+  max = 100
+): Promise<InstagramMedia[]> {
+  const url = new URL(`${instagramGraphBase()}/${igUserId}/collaborative_media`);
+  url.searchParams.set("fields", MEDIA_FIELDS);
+  url.searchParams.set("limit", String(Math.min(50, max)));
+  url.searchParams.set("access_token", accessToken);
+
+  const results: InstagramMedia[] = [];
+  let nextUrl: string | null = url.toString();
+  while (nextUrl !== null && results.length < max) {
+    const response: Response = await fetch(nextUrl);
+    const page = await handleResponse<{
+      data: InstagramMedia[];
+      paging?: { next?: string };
+    }>(response);
+    results.push(...(page.data ?? []));
+    nextUrl = page.paging?.next ?? null;
+  }
+  return results.slice(0, max);
 }
 
 export async function debugToken(inputToken: string, accessToken: string) {

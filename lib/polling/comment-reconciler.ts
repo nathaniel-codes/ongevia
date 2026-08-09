@@ -80,15 +80,22 @@ export async function reconcileComments(): Promise<void> {
           instagramId: true,
           username: true,
           accessToken: true,
+          isPlatformShared: true,
+          workspaceId: true,
         },
       },
     },
   });
 
+  const { filterAutomationsByPlatformClaims } = await import(
+    "@/lib/post-claims"
+  );
+  const allowed = await filterAutomationsByPlatformClaims(automations);
+
   const sinceMs = Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000;
   const tokenCache = new Map<string, string | null>();
 
-  for (const automation of automations) {
+  for (const automation of allowed) {
     const stat = await sweepCampaign(automation, sinceMs, tokenCache).catch(
       (error): SweepStat => ({
         campaign: automation.name,

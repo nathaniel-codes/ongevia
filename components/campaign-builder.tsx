@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
 import PostPicker from "@/components/post-picker";
+import PostClaimPanel from "@/components/post-claim-panel";
 import CampaignPreview, { type PreviewTab } from "@/components/campaign-preview";
 import { readCache, writeCache } from "@/lib/client-cache";
 import {
@@ -154,6 +155,15 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
   // can flag them and the user knows not to double-assign. Maps postId ->
   // the campaign name using it (for the tooltip).
   const [usedPosts, setUsedPosts] = useState<Record<string, string>>({});
+
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.id === selectedAccountId) ?? null,
+    [accounts, selectedAccountId]
+  );
+  const isCollaborateAccount = Boolean(selectedAccount?.isPlatformShared);
+  const effectiveTriggerScope: TriggerScope = isCollaborateAccount
+    ? "specific"
+    : triggerScope;
 
   const [matchMode, setMatchMode] = useState<MatchMode>("specific");
   const [keywordText, setKeywordText] = useState("");
@@ -387,7 +397,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
     setError(null);
 
     if (!selectedAccountId) return setError("Connect an Instagram account first.");
-    if (triggerScope === "specific" && !postId)
+    if (effectiveTriggerScope === "specific" && !postId)
       return setError("Pick a post or reel to trigger the campaign.");
     if (matchMode === "specific" && keywords.length === 0)
       return setError("Add at least one keyword, or switch to any word.");
@@ -400,10 +410,10 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
     const payload = {
       name: name.trim() || `Campaign for @${username}`,
       instagramAccountId: selectedAccountId,
-      postId: triggerScope === "specific" ? postId : null,
-      postUrl: triggerScope === "specific" ? postUrl : null,
-      matchAnyPost: triggerScope === "any",
-      pendingNextReel: triggerScope === "next",
+      postId: effectiveTriggerScope === "specific" ? postId : null,
+      postUrl: effectiveTriggerScope === "specific" ? postUrl : null,
+      matchAnyPost: effectiveTriggerScope === "any",
+      pendingNextReel: effectiveTriggerScope === "next",
       matchAnyWord: matchMode === "any",
       keywords: matchMode === "any" ? [] : keywords,
       dmTriggerEnabled,
@@ -449,7 +459,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         // the picker flags it on the next imported row — the fetch that builds
         // this map doesn't re-run while the builder stays mounted through the
         // import queue.
-        if (triggerScope === "specific" && postId) {
+        if (effectiveTriggerScope === "specific" && postId) {
           const assignedPostId = postId;
           setUsedPosts((prev) => ({ ...prev, [assignedPostId]: payload.name }));
         }
@@ -657,6 +667,10 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                   setPostId(null);
                   setPostUrl(null);
                   setPostThumb(null);
+                  const next = accounts.find((a) => a.id === id);
+                  if (next?.isPlatformShared) {
+                    setTriggerScope("specific");
+                  }
                 }}
                 includeAll={false}
                 label="Instagram account"
@@ -666,34 +680,57 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         </div>
 
         <Section title="When someone comments on">
+          {isCollaborateAccount ? (
+            <p className="text-xs text-muted">
+              Shared Ongevia page — pick a post you have claimed and verified.
+              Replies send from @{selectedAccount?.username}.
+            </p>
+          ) : null}
           <Radio
-            checked={triggerScope === "specific"}
+            checked={effectiveTriggerScope === "specific"}
             onSelect={() => setTriggerScope("specific")}
           >
             a specific post or reel
           </Radio>
-          {triggerScope === "specific" && (
-            <div className="rounded-lg border border-border p-2">
-              <PostPicker
-                selectedPostId={postId}
-                instagramAccountId={selectedAccountId}
-                usedPostIds={usedPosts}
-                onSelect={handlePostSelect}
-              />
+          {effectiveTriggerScope === "specific" && (
+            <div className="space-y-3 rounded-lg border border-border p-2">
+              {isCollaborateAccount ? (
+                <PostClaimPanel
+                  compact
+                  selectedMediaId={postId}
+                  onClaimedPostSelect={(mediaId, url) => {
+                    setPostId(mediaId);
+                    setPostUrl(url);
+                    setPostThumb(null);
+                    setPostCaption("");
+                  }}
+                />
+              ) : (
+                <PostPicker
+                  selectedPostId={postId}
+                  instagramAccountId={selectedAccountId}
+                  usedPostIds={usedPosts}
+                  onSelect={handlePostSelect}
+                />
+              )}
             </div>
           )}
-          <Radio
-            checked={triggerScope === "any"}
-            onSelect={() => setTriggerScope("any")}
-          >
-            any post or reel
-          </Radio>
-          <Radio
-            checked={triggerScope === "next"}
-            onSelect={() => setTriggerScope("next")}
-          >
-            next post or reel
-          </Radio>
+          {!isCollaborateAccount ? (
+            <>
+              <Radio
+                checked={triggerScope === "any"}
+                onSelect={() => setTriggerScope("any")}
+              >
+                any post or reel
+              </Radio>
+              <Radio
+                checked={triggerScope === "next"}
+                onSelect={() => setTriggerScope("next")}
+              >
+                next post or reel
+              </Radio>
+            </>
+          ) : null}
         </Section>
 
         <Section title="And this comment has">

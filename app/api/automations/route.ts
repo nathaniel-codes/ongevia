@@ -10,6 +10,8 @@ import {
   canManageWorkspace,
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
+import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
+import { assertCanAutomatePlatformPost } from "@/lib/post-claims";
 
 // This list is read-your-writes (created/imported campaigns must show up
 // immediately), so never cache it at the route or CDN layer.
@@ -317,14 +319,7 @@ export async function POST(request: NextRequest) {
       where: { id: workspaceId },
       select: { id: true },
     }),
-    requestedInstagramAccountId
-      ? prisma.instagramAccount.findFirst({
-          where: { id: requestedInstagramAccountId, workspaceId },
-        })
-      : prisma.instagramAccount.findFirst({
-          where: { workspaceId },
-          orderBy: { connectedAt: "desc" },
-        }),
+    getWorkspaceInstagramAccount(workspaceId, requestedInstagramAccountId),
   ]);
 
   if (!workspace) {
@@ -338,6 +333,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { success: false, error: "Connect Instagram before creating campaigns" },
       { status: 400 }
+    );
+  }
+
+  const claimGate = await assertCanAutomatePlatformPost({
+    workspaceId,
+    account: instagramAccount,
+    postId: parsed.data.postId,
+    matchAnyPost: parsed.data.matchAnyPost,
+    pendingNextReel: parsed.data.pendingNextReel,
+  });
+  if (!claimGate.ok) {
+    return NextResponse.json(
+      { success: false, error: claimGate.error },
+      { status: claimGate.status }
     );
   }
 
@@ -487,12 +496,38 @@ export async function PATCH(request: NextRequest) {
 
   const existing = await prisma.automation.findFirst({
     where: { id: automationId, workspaceId },
+    include: { instagramAccount: true },
   });
 
   if (!existing) {
     return NextResponse.json(
       { success: false, error: "Campaign not found" },
       { status: 404 }
+    );
+  }
+
+  const nextMatchAny =
+    parsed.data.matchAnyPost ?? existing.matchAnyPost;
+  const nextPending =
+    parsed.data.pendingNextReel ?? existing.pendingNextReel;
+  const nextPostId =
+    nextMatchAny || nextPending
+      ? null
+      : parsed.data.postId !== undefined
+        ? parsed.data.postId
+        : existing.postId;
+
+  const claimGate = await assertCanAutomatePlatformPost({
+    workspaceId,
+    account: existing.instagramAccount,
+    postId: nextPostId,
+    matchAnyPost: nextMatchAny,
+    pendingNextReel: nextPending,
+  });
+  if (!claimGate.ok) {
+    return NextResponse.json(
+      { success: false, error: claimGate.error },
+      { status: claimGate.status }
     );
   }
 

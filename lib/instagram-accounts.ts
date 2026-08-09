@@ -30,7 +30,7 @@ export async function canConnectInstagramAccount({
 }
 
 export async function getPlatformSharedAccount() {
-  const preferred = (process.env.PLATFORM_INSTAGRAM_USERNAME ?? "ongevia")
+  const preferred = (process.env.PLATFORM_INSTAGRAM_USERNAME ?? "ongeviadotcom")
     .trim()
     .replace(/^@/, "")
     .toLowerCase();
@@ -48,17 +48,26 @@ export async function getPlatformSharedAccount() {
   });
 }
 
-/** Accounts the workspace can use for campaigns: own + platform shared. */
+/** Accounts the workspace can use for campaigns: own + platform shared (if collaborating). */
 export async function listInstagramAccountsForWorkspace(workspaceId: string) {
-  const [own, platform] = await Promise.all([
+  const [own, platform, collaborate] = await Promise.all([
     prisma.instagramAccount.findMany({
       where: { workspaceId },
       orderBy: { connectedAt: "desc" },
     }),
     getPlatformSharedAccount(),
+    prisma.platformSetting.findUnique({
+      where: { key: `workspace:${workspaceId}:collaborate` },
+    }),
   ]);
 
-  if (!platform || platform.workspaceId === workspaceId) {
+  const collaborating = Boolean(collaborate?.value);
+  if (
+    !platform ||
+    !platform.isPlatformShared ||
+    platform.workspaceId === workspaceId ||
+    !collaborating
+  ) {
     return own;
   }
 

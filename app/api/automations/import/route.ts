@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db/client";
 import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
+import { assertCanAutomatePlatformPost } from "@/lib/post-claims";
 import { generateReportShareSlug } from "@/lib/reports/share";
 import { generateTrackedLinkSlug } from "@/lib/tracking/server";
 import {
@@ -76,6 +77,18 @@ export async function POST(request: NextRequest) {
     row++;
     if (usedPostIds.has(campaign.postId)) {
       skipped.push({ row, reason: "a campaign already exists for this post" });
+      continue;
+    }
+
+    const claimGate = await assertCanAutomatePlatformPost({
+      workspaceId: context.workspaceId,
+      account,
+      postId: campaign.postId,
+      matchAnyPost: false,
+      pendingNextReel: false,
+    });
+    if (!claimGate.ok) {
+      skipped.push({ row, reason: claimGate.error });
       continue;
     }
 

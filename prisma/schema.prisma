@@ -188,6 +188,7 @@ model Workspace {
   linkClicks        LinkClick[]
   webhookEvents     WebhookEvent[]
   operationalEvents OperationalEvent[]
+  postClaims        PostClaim[]
 
   @@index([ownerId])
 }
@@ -247,9 +248,43 @@ model InstagramAccount {
   dmLogs      DmLog[]
   linkClicks  LinkClick[]
   followerSnapshots FollowerSnapshot[]
+  postClaims  PostClaim[]
 
   @@index([workspaceId])
   @@index([isPlatformShared])
+}
+
+enum PostClaimStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  RELEASED
+}
+
+/// Exclusive claim of a platform-shared IG media item by one workspace.
+/// Collaborate campaigns require a VERIFIED claim for the target postId.
+model PostClaim {
+  id                 String          @id @default(cuid())
+  workspaceId        String
+  instagramAccountId String
+  mediaId            String
+  postUrl            String?
+  claimantIgUsername String
+  claimantIgUserId   String?
+  codeHash           String
+  attempts           Int             @default(0)
+  expiresAt          DateTime
+  verifiedAt         DateTime?
+  status             PostClaimStatus @default(PENDING)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  instagramAccount InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([instagramAccountId, mediaId])
+  @@index([status])
 }
 
 model FollowerSnapshot {

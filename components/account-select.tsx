@@ -5,6 +5,7 @@ export interface AccountOption {
   username: string;
   instagramId: string;
   name?: string | null;
+  isPlatformShared?: boolean;
 }
 
 interface AccountSelectProps {
@@ -36,6 +37,7 @@ export default function AccountSelect({
         {accounts.map((account) => (
           <option key={account.id} value={account.id}>
             @{account.username}
+            {account.isPlatformShared ? " (Ongevia shared)" : ""}
           </option>
         ))}
       </select>

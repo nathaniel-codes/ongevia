@@ -97,6 +97,10 @@ select:focus-visible {
   animation: ongevia-fade-up 0.55s ease-out both;
 }
 
+.ongevia-fade-up {
+  animation: ongevia-fade-up 0.6s ease-out both;
+}
+
 .animate-slide-in {
   animation: ongevia-fade-up 0.7s ease-out both;
 }

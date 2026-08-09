@@ -28,6 +28,7 @@ import {
 import { decryptToken } from "@/lib/meta/oauth";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
 import { reserveDMSlot } from "@/lib/utils/rate-limiter";
+import { filterAutomationsByPlatformClaims, tryVerifyPostClaimFromInboundDm } from "@/lib/post-claims";
 import {
   releaseWorkspaceDMReservation,
   reserveWorkspaceDMSend,
@@ -223,7 +224,11 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     orderBy: { createdAt: "asc" },
   });
 
-  for (const automation of automations) {
+  const allowedAutomations = await filterAutomationsByPlatformClaims(
+    automations
+  );
+
+  for (const automation of allowedAutomations) {
     // "Any word" campaigns fire on every comment; otherwise require a keyword hit.
     const matchResult = automation.matchAnyWord
       ? { matched: true, matchedKeyword: null }
@@ -937,6 +942,16 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
  */
 async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
   const { instagramAccountId, messageId, messageText, senderId } = job.data;
+
+  // Collaborate post claims: user DMs `connect ######` to the shared page.
+  const claimResult = await tryVerifyPostClaimFromInboundDm({
+    platformInstagramId: instagramAccountId,
+    senderId,
+    messageText,
+  });
+  if (claimResult.verified) {
+    return;
+  }
 
   const automations = await prisma.automation.findMany({
     where: {

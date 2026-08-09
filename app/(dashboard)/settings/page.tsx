@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import type { AccountOption } from "@/components/account-select";
 import { InstagramConnectNotice } from "@/components/instagram-connect-notice";
+import CollaborateGuide from "@/components/collaborate-guide";
 
 interface SettingsData {
   workspace: {
@@ -20,6 +21,7 @@ interface SettingsData {
     AccountOption & {
       tokenExpiresAt: string | null;
       webhookSubscribed: boolean;
+      isPlatformShared?: boolean;
     }
   >;
 }
@@ -56,15 +58,27 @@ export default function SettingsPage() {
   const [invitePhone, setInvitePhone] = useState("");
   const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [collaborating, setCollaborating] = useState(false);
+  const [platformUsername, setPlatformUsername] = useState<string | null>(null);
+  const [collabError, setCollabError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/dashboard/stats").then((res) => res.json()),
       fetch("/api/workspace/members").then((res) => res.json()),
+      fetch("/api/instagram/accounts").then((res) => res.json()),
     ])
-      .then(([statsPayload, membersPayload]) => {
+      .then(([statsPayload, membersPayload, accountsPayload]) => {
         if (statsPayload.success) setData(statsPayload.data);
         if (membersPayload.success) setMembersData(membersPayload.data);
+        if (accountsPayload.success) {
+          setCollaborating(Boolean(accountsPayload.data?.collaborating));
+          const shared = (accountsPayload.data?.instagramAccounts ?? []).find(
+            (a: { isPlatformShared?: boolean; username?: string }) =>
+              a.isPlatformShared
+          );
+          setPlatformUsername(shared?.username ?? null);
+        }
       })
       .finally(() => setLoading(false));
   }, []);
@@ -219,25 +233,6 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={async () => {
-              setBusy("collaborate");
-              setMemberError(null);
-              const res = await fetch("/api/instagram/collaborate", { method: "POST" });
-              const payload = await res.json().catch(() => ({}));
-              if (!res.ok) {
-                setMemberError(payload.error ?? "Collaborate unavailable");
-              } else {
-                window.location.reload();
-              }
-              setBusy(null);
-            }}
-            disabled={busy === "collaborate"}
-            className="px-4 py-2 rounded text-sm font-medium border border-border hover:bg-surface-hover disabled:opacity-50"
-          >
-            {busy === "collaborate" ? "Enabling…" : "Collaborate via Ongevia page"}
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
               setBusy("resubscribe");
               await fetch("/api/instagram/resubscribe", { method: "POST" });
               window.location.reload();
@@ -249,12 +244,40 @@ export default function SettingsPage() {
           </button>
         </div>
         <p className="mt-3 text-xs text-muted">
-          <strong>Connect my Instagram</strong> sends DMs from your own page.{" "}
-          <strong>Collaborate via Ongevia page</strong> lets you run campaigns on the
-          shared @ongevia account (replies come from Ongevia). Admin must connect and
-          share that account first.
+          Connect your own Instagram to send DMs from your page. Prefer not to
+          OAuth? Use Collaborate below — replies come from @ongeviadotcom.
         </p>
       </section>
+
+      <CollaborateGuide
+        collaborating={collaborating}
+        platformUsername={platformUsername}
+        busy={busy === "collaborate"}
+        error={collabError}
+        onEnable={async () => {
+          setBusy("collaborate");
+          setCollabError(null);
+          const res = await fetch("/api/instagram/collaborate", {
+            method: "POST",
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            setCollabError(payload.error ?? "Collaborate unavailable");
+          } else {
+            setCollaborating(true);
+            setPlatformUsername(payload.data?.username ?? platformUsername);
+            window.location.reload();
+          }
+          setBusy(null);
+        }}
+        onDisable={async () => {
+          setBusy("collaborate");
+          await fetch("/api/instagram/collaborate", { method: "DELETE" });
+          setCollaborating(false);
+          setBusy(null);
+          window.location.reload();
+        }}
+      />
 
       <section className="panel rounded p-4 sm:p-6">
         <h2 className="text-base font-semibold mb-6">Team</h2>
