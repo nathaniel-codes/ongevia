@@ -29,15 +29,25 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < /etc/ongevia/.env
 set +a
 
-echo "[deploy] npm install…"
-# Build needs devDependencies (Tailwind/PostCSS). Avoid partial installs.
-rm -rf node_modules
+echo "[deploy] stopping services for a clean install…"
+systemctl stop ongevia-web ongevia-worker 2>/dev/null || true
+# Avoid races with leftover next/npm processes
+pkill -f "next build" 2>/dev/null || true
+pkill -f "npm ci" 2>/dev/null || true
+sleep 1
+
+echo "[deploy] npm ci…"
+# Build needs devDependencies (Tailwind/PostCSS).
+rm -rf node_modules .next
 npm ci --include=dev
+export PATH="$APP_DIR/node_modules/.bin:$PATH"
 npx prisma generate
 npx prisma migrate deploy
+# Ensure admin + @ongeviadotcom platform account from env (no wipe)
+npx tsx scripts/bootstrap-platform.ts || true
 npm run build
 
-systemctl restart ongevia-web ongevia-worker
+systemctl start ongevia-web ongevia-worker
 sleep 2
 systemctl --no-pager --full status ongevia-web ongevia-worker | head -40
 curl -fsS http://127.0.0.1:3010/api/health || true

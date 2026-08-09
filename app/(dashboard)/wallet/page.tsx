@@ -18,7 +18,7 @@ export default function WalletPage() {
   >([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [creditsPer1000, setCreditsPer1000] = useState(100);
+  const [creditsPer1000, setCreditsPer1000] = useState(1000);
 
   async function load() {
     const res = await fetch("/api/wallet");
@@ -65,7 +65,7 @@ export default function WalletPage() {
         <p className="text-sm text-muted">Credit balance</p>
         <p className="mt-2 font-display text-4xl font-semibold">{balance}</p>
         <p className="mt-2 text-xs text-muted">
-          {creditsPer1000} credits per 1,000 TZS · used when DMs send
+          {creditsPer1000} credits per 1,000 TZS · each reply costs credits when DMs send
         </p>
       </section>
 

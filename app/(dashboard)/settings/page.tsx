@@ -200,6 +200,11 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-sm font-semibold text-foreground">
                     @{account.username}
+                    {account.isPlatformShared ? (
+                      <span className="ml-2 text-xs font-medium text-accent">
+                        Ongevia shared
+                      </span>
+                    ) : null}
                   </p>
                   <p className="mt-1 text-xs text-muted">
                     Token expires{" "}
@@ -209,15 +214,19 @@ export default function SettingsPage() {
                     · {account.webhookSubscribed ? "Webhook ready" : "Webhook pending"}
                   </p>
                 </div>
-                <button
-                  onClick={() => disconnectInstagram(account.id)}
-                  disabled={busy === `disconnect:${account.id}`}
-                  className="inline-flex items-center justify-center rounded border border-error/20 px-4 py-2 text-sm font-medium text-error transition-all hover:border-error/40 hover:bg-error/10 disabled:opacity-50"
-                >
-                  {busy === `disconnect:${account.id}`
-                    ? "Disconnecting..."
-                    : "Disconnect"}
-                </button>
+                {!account.isPlatformShared ? (
+                  <button
+                    onClick={() => disconnectInstagram(account.id)}
+                    disabled={busy === `disconnect:${account.id}`}
+                    className="inline-flex items-center justify-center rounded border border-error/20 px-4 py-2 text-sm font-medium text-error transition-all hover:border-error/40 hover:bg-error/10 disabled:opacity-50"
+                  >
+                    {busy === `disconnect:${account.id}`
+                      ? "Disconnecting..."
+                      : "Disconnect"}
+                  </button>
+                ) : (
+                  <span className="text-xs text-muted">Managed by Ongevia</span>
+                )}
               </div>
             ))}
           </div>

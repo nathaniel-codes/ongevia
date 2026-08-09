@@ -2,11 +2,45 @@ import { prisma } from "@/lib/db/client";
 import type { Prisma, WalletTransactionType } from "@/app/generated/prisma/client";
 import { logAction } from "@/lib/action-log";
 
-export async function ensureWallet(userId: string) {
-  return prisma.wallet.upsert({
-    where: { userId },
-    create: { userId, balance: 0 },
-    update: {},
+export async function getSignupBonusCredits(): Promise<number> {
+  const setting = await prisma.platformSetting.findUnique({
+    where: { key: "SIGNUP_BONUS_CREDITS" },
+  });
+  if (setting) {
+    const n = Number(setting.value);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  const env = Number(process.env.SIGNUP_BONUS_CREDITS ?? "1000");
+  return Number.isFinite(env) && env >= 0 ? env : 1000;
+}
+
+/** Create wallet if missing. On first create, optionally grant signup bonus. */
+export async function ensureWallet(
+  userId: string,
+  options?: { grantSignupBonus?: boolean }
+) {
+  const existing = await prisma.wallet.findUnique({ where: { userId } });
+  if (existing) return existing;
+
+  const bonus = options?.grantSignupBonus ? await getSignupBonusCredits() : 0;
+
+  return prisma.$transaction(async (tx) => {
+    const wallet = await tx.wallet.create({
+      data: { userId, balance: bonus },
+    });
+    if (bonus > 0) {
+      await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: bonus,
+          balanceAfter: wallet.balance,
+          type: "ADMIN_GRANT",
+          reference: "signup_bonus",
+          note: `Welcome bonus — ${bonus} TZS credits`,
+        },
+      });
+    }
+    return wallet;
   });
 }
 
@@ -18,8 +52,9 @@ export async function getCreditsPer1000Tzs(): Promise<number> {
     const n = Number(setting.value);
     if (Number.isFinite(n) && n > 0) return n;
   }
-  const env = Number(process.env.CREDITS_PER_1000_TZS ?? "100");
-  return Number.isFinite(env) && env > 0 ? env : 100;
+  // 1 credit = 1 TZS by default (1000 credits per 1000 TZS top-up)
+  const env = Number(process.env.CREDITS_PER_1000_TZS ?? "1000");
+  return Number.isFinite(env) && env > 0 ? env : 1000;
 }
 
 export async function getDmCreditCost(): Promise<number> {
@@ -30,8 +65,9 @@ export async function getDmCreditCost(): Promise<number> {
     const n = Number(setting.value);
     if (Number.isFinite(n) && n >= 0) return n;
   }
-  const env = Number(process.env.DM_CREDIT_COST ?? "1");
-  return Number.isFinite(env) && env >= 0 ? env : 1;
+  // Each automated comment/reply DM costs 10 TZS (credits)
+  const env = Number(process.env.DM_CREDIT_COST ?? "10");
+  return Number.isFinite(env) && env >= 0 ? env : 10;
 }
 
 export function creditsForAmount(amountTzs: number, per1000: number): number {
@@ -118,7 +154,7 @@ export async function spendDmCredits(workspaceId: string): Promise<{
       amount: -cost,
       type: "DM_SPEND",
       reference: workspaceId,
-      note: "DM send",
+      note: "Comment/reply DM",
     });
     return { allowed: true, remaining: balance, cost };
   } catch {

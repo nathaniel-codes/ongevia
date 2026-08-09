@@ -1,8 +1,7 @@
 name: Deploy Ongevia to VPS
 
+# Manual only — avoids failed deploy emails while we stabilize installs.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -15,6 +14,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 20m
           script: |
             export APP_DIR="${{ secrets.VPS_APP_DIR }}"
-            bash "$APP_DIR/deploy/deploy.sh" || bash "$APP_DIR/ongevia/deploy/deploy.sh"
+            bash "$APP_DIR/deploy/deploy.sh"

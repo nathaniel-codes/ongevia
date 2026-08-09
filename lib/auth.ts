@@ -41,8 +41,17 @@ export const authConfig = {
               name: displayName || null,
             },
           });
-          await ensureWorkspaceForUser(user.id, phone);
-          await ensureWallet(user.id);
+          const workspace = await ensureWorkspaceForUser(user.id, phone);
+          await ensureWallet(user.id, { grantSignupBonus: true });
+          // New users get collaborate mode on by default (shared @ongeviadotcom).
+          await prisma.platformSetting.upsert({
+            where: { key: `workspace:${workspace.id}:collaborate` },
+            create: {
+              key: `workspace:${workspace.id}:collaborate`,
+              value: "1",
+            },
+            update: { value: "1" },
+          });
           await logAction({
             actorUserId: user.id,
             action: "auth.signup",
