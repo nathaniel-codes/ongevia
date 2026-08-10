@@ -85,8 +85,11 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           verified: result.verified,
+          confirmationSent: result.confirmationSent ?? false,
           message: result.verified
-            ? "Connected. You can continue your campaign."
+            ? result.confirmationSent
+              ? "Connected. Check Instagram for the confirmation DM."
+              : "Connected. Your post is linked — Meta blocked the confirmation DM, but you can continue the campaign."
             : result.error,
         },
       });

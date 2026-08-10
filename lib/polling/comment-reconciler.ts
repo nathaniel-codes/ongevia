@@ -35,7 +35,12 @@ import {
 } from "@/lib/meta/client";
 import { decryptToken } from "@/lib/meta/oauth";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
-import { isShortcodeMediaId } from "@/lib/utils/csv";
+import {
+  instagramShortcode,
+  isShortcodeMediaId,
+  parseShortcodeMediaId,
+} from "@/lib/utils/csv";
+import { resolveInstagramMediaIdFromUrl } from "@/lib/instagram-media-id";
 
 // Only consider comments from the last few days — older ones are outside
 // Instagram's private-reply window anyway, so a DM to them would just fail.
@@ -69,6 +74,7 @@ export async function reconcileComments(): Promise<void> {
       id: true,
       name: true,
       postId: true,
+      postUrl: true,
       matchAnyPost: true,
       matchAnyWord: true,
       keywords: true,
@@ -116,6 +122,7 @@ async function sweepCampaign(
     id: string;
     name: string;
     postId: string | null;
+    postUrl: string | null;
     matchAnyPost: boolean;
     matchAnyWord: boolean;
     keywords: string[];
@@ -162,11 +169,39 @@ async function sweepCampaign(
   // matches any post.
   const mediaIds: string[] = [];
   if (automation.postId) {
-    if (isShortcodeMediaId(automation.postId)) {
-      // Waiting for a webhook/comment to resolve shortcode → Graph media id.
-      return stat;
+    let postId = automation.postId;
+    if (isShortcodeMediaId(postId) || !/^\d+$/.test(postId)) {
+      const shortcode =
+        parseShortcodeMediaId(postId) ??
+        (automation.postUrl ? instagramShortcode(automation.postUrl) : null);
+      const source = automation.postUrl ?? shortcode;
+      if (source) {
+        try {
+          const resolved = await resolveInstagramMediaIdFromUrl(source);
+          if (resolved) {
+            postId = resolved;
+            await prisma.automation.update({
+              where: { id: automation.id },
+              data: { postId: resolved },
+            });
+            await prisma.postClaim.updateMany({
+              where: {
+                instagramAccountId: account.id,
+                mediaId: automation.postId,
+                status: "VERIFIED",
+              },
+              data: { mediaId: resolved },
+            });
+          }
+        } catch (error) {
+          stat.errors.push(`Resolve media: ${errMessage(error)}`);
+        }
+      }
+      if (isShortcodeMediaId(postId) || !/^\d+$/.test(postId)) {
+        return stat;
+      }
     }
-    mediaIds.push(automation.postId);
+    mediaIds.push(postId);
   } else if (automation.matchAnyPost) {
     try {
       const media = await getUserMedia(accessToken, RECENT_MEDIA_LIMIT);

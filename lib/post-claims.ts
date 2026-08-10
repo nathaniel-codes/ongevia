@@ -18,6 +18,7 @@ import {
   isShortcodeMediaId,
   shortcodeMediaId,
 } from "@/lib/utils/csv";
+import { resolveInstagramMediaIdFromUrl } from "@/lib/instagram-media-id";
 import { logAction } from "@/lib/action-log";
 
 /** User pastes this exact line into a DM to the shared Ongevia page. */
@@ -228,6 +229,7 @@ export async function createPostClaim(params: {
 
   // Instagram Login tokens cannot list collaborative_media. After the user
   // accepts the collab invite in the app, claim by permalink shortcode instead.
+  // Prefer a scraped numeric media id when available so comment polling can run.
   if (!resolved) {
     const shortcode = params.postUrl
       ? instagramShortcode(params.postUrl)
@@ -240,8 +242,11 @@ export async function createPostClaim(params: {
         status: 400,
       };
     }
+    const numericId = params.postUrl
+      ? await resolveInstagramMediaIdFromUrl(params.postUrl)
+      : null;
     resolved = {
-      mediaId: shortcodeMediaId(shortcode),
+      mediaId: numericId ?? shortcodeMediaId(shortcode),
       postUrl:
         params.postUrl?.trim() ||
         `https://www.instagram.com/p/${shortcode}/`,
@@ -622,6 +627,7 @@ export async function confirmPendingClaimWithUsername(params: {
   verified: boolean;
   error?: string;
   status?: number;
+  confirmationSent?: boolean;
 }> {
   const username = params.claimantIgUsername
     .trim()
@@ -707,6 +713,7 @@ export async function confirmPendingClaimWithUsername(params: {
   });
 
   // Best-effort confirmation DM if we can find an open thread.
+  let confirmationSent = false;
   if (platform?.accessToken) {
     try {
       const accessToken = decryptToken(platform.accessToken);
@@ -722,6 +729,7 @@ export async function confirmPendingClaimWithUsername(params: {
           contact.id,
           `You're connected, @${username}. This post is linked to your Ongevia workspace — go back and continue your campaign.`
         );
+        confirmationSent = true;
       }
     } catch (err) {
       console.warn(
@@ -731,7 +739,7 @@ export async function confirmPendingClaimWithUsername(params: {
     }
   }
 
-  return { ok: true, verified: true };
+  return { ok: true, verified: true, confirmationSent };
 }
 
 /** Status polling helper for the claim UI. */

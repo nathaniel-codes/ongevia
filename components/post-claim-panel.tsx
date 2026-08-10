@@ -36,7 +36,6 @@ export default function PostClaimPanel({
   const [error, setError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [waiting, setWaiting] = useState(false);
   const [needsUsername, setNeedsUsername] = useState(false);
   const [claimantUsername, setClaimantUsername] = useState("");
 
@@ -49,11 +48,18 @@ export default function PostClaimPanel({
   }, []);
 
   const markVerified = useCallback(
-    async (mediaId?: string | null, verifiedPostUrl?: string | null) => {
+    async (
+      mediaId?: string | null,
+      verifiedPostUrl?: string | null,
+      note?: string | null
+    ) => {
       setPending(null);
-      setWaiting(false);
       setPostUrl("");
-      setStatusNote("Connected. Check Instagram for the confirmation DM.");
+      setNeedsUsername(false);
+      setStatusNote(
+        note ??
+          "Connected. Your post is linked — continue building your campaign."
+      );
       await reload();
       if (onClaimedPostSelect && mediaId) {
         onClaimedPostSelect(mediaId, verifiedPostUrl ?? null);
@@ -114,8 +120,7 @@ export default function PostClaimPanel({
         platformUsername: payload.data.platformUsername,
         expiresAt: payload.data.expiresAt,
       });
-      setWaiting(true);
-      setNeedsUsername(false);
+      setNeedsUsername(true);
       setClaimantUsername("");
     }
     setBusy(null);
@@ -132,7 +137,7 @@ export default function PostClaimPanel({
       body: JSON.stringify({
         action: "check",
         claimId: pending.id,
-        ...(needsUsername && claimantUsername.trim()
+        ...(claimantUsername.trim()
           ? { claimantUsername: claimantUsername.trim() }
           : {}),
       }),
@@ -151,10 +156,11 @@ export default function PostClaimPanel({
       setNeedsUsername(false);
       await markVerified(
         statusPayload.data?.mediaId,
-        statusPayload.data?.postUrl
+        statusPayload.data?.postUrl,
+        payload.data?.message
       );
     } else {
-      if (payload.data?.needsUsername) setNeedsUsername(true);
+      setNeedsUsername(true);
       setStatusNote(payload.data?.message ?? "Not verified yet.");
     }
     setBusy(null);
@@ -172,7 +178,6 @@ export default function PostClaimPanel({
     } else {
       if (pending?.id === id) {
         setPending(null);
-        setWaiting(false);
       }
       await reload();
     }
@@ -254,7 +259,11 @@ export default function PostClaimPanel({
               onClick={() => void checkClaim()}
               className="rounded bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
             >
-              {busy === "check" ? "Checking…" : "Check"}
+              {busy === "check"
+                ? "Checking…"
+                : claimantUsername.trim()
+                  ? "Confirm"
+                  : "Check"}
             </button>
           </div>
           {needsUsername ? (
@@ -268,17 +277,23 @@ export default function PostClaimPanel({
                 onChange={(e) => setClaimantUsername(e.target.value)}
                 placeholder="@yourusername"
                 className="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && claimantUsername.trim()) {
+                    e.preventDefault();
+                    void checkClaim();
+                  }
+                }}
               />
               <p className="text-xs text-muted">
-                Meta isn’t exposing this inbox to the API yet. Confirm with the
-                username you DMd from, then tap Check.
+                DM the code to @{pending.platformUsername}, enter the username
+                you sent it from, then tap Confirm.
               </p>
             </div>
           ) : null}
           <p className="text-xs text-muted">
-            {waiting
-              ? "After you send the DM, tap Check — or wait, this page also updates automatically."
-              : "Send the DM, then tap Check."}
+            {claimantUsername.trim()
+              ? "Tap Confirm after you’ve sent the DM."
+              : "Send the DM, then enter your username and tap Confirm."}
             {pending.expiresAt
               ? ` Code expires ${new Date(pending.expiresAt).toLocaleTimeString()}.`
               : null}
@@ -287,7 +302,6 @@ export default function PostClaimPanel({
             type="button"
             onClick={() => {
               setPending(null);
-              setWaiting(false);
               void releaseClaim(pending.id);
             }}
             className="rounded border border-border px-3 py-1.5 text-xs"
