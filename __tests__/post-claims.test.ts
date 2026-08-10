@@ -34,7 +34,8 @@ beforeEach(() => {
 
 describe("claim DM phrase", () => {
   it("builds and extracts connect codes", () => {
-    expect(buildClaimDmText("482913")).toBe("connect 482913");
+    expect(buildClaimDmText("482913")).toBe("482913");
+    expect(extractClaimCodeFromMessage("482913")).toBe("482913");
     expect(extractClaimCodeFromMessage("connect 482913")).toBe("482913");
     expect(extractClaimCodeFromMessage("hey CONNECT 482913 thanks")).toBe(
       "482913"

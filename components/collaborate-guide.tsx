@@ -18,7 +18,7 @@ const steps = [
     n: "02",
     title: "Claim the post here",
     body:
-      "Paste the post link below, copy the connect code, and DM it to @" +
+      "Paste the post link below, copy the code, and DM it to @" +
       PLATFORM_HANDLE +
       ". That locks the post to your workspace.",
   },
@@ -102,7 +102,7 @@ export default function CollaborateGuide({
           <p className="font-display text-xl text-[#0b1f1c]">Claim your post</p>
           <p className="mt-1 text-xs text-[#5a6f6a]">
             After @{handle} appears as collaborator on Instagram, claim the
-            permalink here and DM the connect code.
+            permalink here and DM the code.
           </p>
           <div className="mt-4">
             <PostClaimPanel />

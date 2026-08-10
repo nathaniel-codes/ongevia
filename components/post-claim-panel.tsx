@@ -34,6 +34,7 @@ export default function PostClaimPanel({
     expiresAt: string | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [statusNote, setStatusNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
 
@@ -44,6 +45,20 @@ export default function PostClaimPanel({
       setClaims(payload.data ?? []);
     }
   }, []);
+
+  const markVerified = useCallback(
+    async (mediaId?: string | null, verifiedPostUrl?: string | null) => {
+      setPending(null);
+      setWaiting(false);
+      setPostUrl("");
+      setStatusNote("Connected. Check Instagram for the confirmation DM.");
+      await reload();
+      if (onClaimedPostSelect && mediaId) {
+        onClaimedPostSelect(mediaId, verifiedPostUrl ?? null);
+      }
+    },
+    [onClaimedPostSelect, reload]
+  );
 
   useEffect(() => {
     const t = setTimeout(() => void reload(), 0);
@@ -61,16 +76,7 @@ export default function PostClaimPanel({
       const payload = await res.json().catch(() => ({}));
       if (cancelled || !res.ok) return;
       if (payload.data?.status === "VERIFIED") {
-        setPending(null);
-        setWaiting(false);
-        setPostUrl("");
-        await reload();
-        if (onClaimedPostSelect && payload.data.mediaId) {
-          onClaimedPostSelect(
-            payload.data.mediaId,
-            payload.data.postUrl ?? null
-          );
-        }
+        await markVerified(payload.data.mediaId, payload.data.postUrl);
       }
     };
     const immediate = setTimeout(() => void tick(), 0);
@@ -80,11 +86,12 @@ export default function PostClaimPanel({
       clearTimeout(immediate);
       clearInterval(interval);
     };
-  }, [pending?.id, onClaimedPostSelect, reload]);
+  }, [pending?.id, markVerified]);
 
   async function requestClaim() {
     setBusy("request");
     setError(null);
+    setStatusNote(null);
     const res = await fetch("/api/instagram/claims", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,12 +104,7 @@ export default function PostClaimPanel({
       return;
     }
     if (payload.data?.alreadyVerified) {
-      await reload();
-      setPending(null);
-      setWaiting(false);
-      if (onClaimedPostSelect && payload.data.mediaId) {
-        onClaimedPostSelect(payload.data.mediaId, payload.data.postUrl ?? null);
-      }
+      await markVerified(payload.data.mediaId, payload.data.postUrl);
     } else {
       setPending({
         id: payload.data.id,
@@ -111,6 +113,37 @@ export default function PostClaimPanel({
         expiresAt: payload.data.expiresAt,
       });
       setWaiting(true);
+    }
+    setBusy(null);
+  }
+
+  async function checkClaim() {
+    if (!pending?.id) return;
+    setBusy("check");
+    setError(null);
+    setStatusNote(null);
+    const res = await fetch("/api/instagram/claims", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "check", claimId: pending.id }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(payload.error ?? "Could not check DM");
+      setBusy(null);
+      return;
+    }
+    if (payload.data?.verified) {
+      const statusRes = await fetch(
+        `/api/instagram/claims?id=${encodeURIComponent(pending.id)}`
+      );
+      const statusPayload = await statusRes.json().catch(() => ({}));
+      await markVerified(
+        statusPayload.data?.mediaId,
+        statusPayload.data?.postUrl
+      );
+    } else {
+      setStatusNote(payload.data?.message ?? "Not verified yet.");
     }
     setBusy(null);
   }
@@ -149,15 +182,18 @@ export default function PostClaimPanel({
         </p>
         <p className="mt-1 text-xs text-muted">
           After @{platformHandle} is a collaborator on your Instagram post, paste
-          the permalink, then DM @{platformHandle}. You can get a connect code
-          right after accepting the invite — Meta does not always list collab
-          posts in the API.
+          the permalink, then DM @{platformHandle} the code below.
         </p>
       </div>
 
       {error ? (
         <p className="rounded border border-error/30 bg-error/5 px-3 py-2 text-xs text-error">
           {error}
+        </p>
+      ) : null}
+      {statusNote ? (
+        <p className="rounded border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-foreground">
+          {statusNote}
         </p>
       ) : null}
 
@@ -176,7 +212,7 @@ export default function PostClaimPanel({
             onClick={() => void requestClaim()}
             className="rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
           >
-            {busy === "request" ? "Creating…" : "Get connect code"}
+            {busy === "request" ? "Creating…" : "Get code"}
           </button>
         </div>
       ) : (
@@ -184,10 +220,10 @@ export default function PostClaimPanel({
           <p className="text-sm text-foreground">
             Open Instagram and DM{" "}
             <span className="font-semibold">@{pending.platformUsername}</span>{" "}
-            this exact message:
+            this code:
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="rounded border border-border bg-background px-3 py-2 text-sm font-semibold tracking-wide">
+            <code className="rounded border border-border bg-background px-4 py-2.5 text-lg font-semibold tracking-[0.2em]">
               {pending.dmText}
             </code>
             <button
@@ -197,11 +233,19 @@ export default function PostClaimPanel({
             >
               Copy
             </button>
+            <button
+              type="button"
+              disabled={busy === "check"}
+              onClick={() => void checkClaim()}
+              className="rounded bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+            >
+              {busy === "check" ? "Checking…" : "Check"}
+            </button>
           </div>
           <p className="text-xs text-muted">
             {waiting
-              ? "Waiting for your DM… this page updates automatically when connected."
-              : "Send the DM, then wait here."}
+              ? "After you send the DM, tap Check — or wait, this page also updates automatically."
+              : "Send the DM, then tap Check."}
             {pending.expiresAt
               ? ` Code expires ${new Date(pending.expiresAt).toLocaleTimeString()}.`
               : null}

@@ -6,8 +6,10 @@ import { decryptToken } from "@/lib/meta/oauth";
 import {
   getAllUserMedia,
   getCollaborativeMedia,
+  getConversationMessages,
   getConversations,
   getMediaById,
+  getUserInfo,
   sendDirectMessage,
 } from "@/lib/meta/client";
 import {
@@ -19,12 +21,25 @@ import { logAction } from "@/lib/action-log";
 
 /** User pastes this exact line into a DM to the shared Ongevia page. */
 export function buildClaimDmText(code: string): string {
-  return `connect ${code}`;
+  return code;
 }
 
 export function extractClaimCodeFromMessage(text: string): string | null {
-  const match = text.trim().match(/\bconnect\s+(\d{6})\b/i);
-  return match?.[1] ?? null;
+  const trimmed = text.trim();
+  const withPrefix = trimmed.match(/\bconnect\s+(\d{6})\b/i);
+  if (withPrefix?.[1]) return withPrefix[1];
+
+  // Prefer a bare 6-digit DM (what we ask users to send).
+  const bare = trimmed.match(/^(\d{6})$/);
+  if (bare?.[1]) return bare[1];
+
+  // Short messages that are mostly the code.
+  if (trimmed.length <= 24) {
+    const loose = trimmed.match(/(?:^|\s)(\d{6})(?:\s|$|[.!,])/);
+    if (loose?.[1]) return loose[1];
+  }
+
+  return null;
 }
 
 const CLAIM_OTP_TTL_MS = 30 * 60 * 1000;
@@ -388,6 +403,7 @@ export async function tryVerifyPostClaimFromInboundDm(params: {
   }
 
   let username: string | null = null;
+  let confirmationSent = false;
   try {
     const accessToken = decryptToken(platform.accessToken);
     username = await resolveSenderUsername({
@@ -396,16 +412,49 @@ export async function tryVerifyPostClaimFromInboundDm(params: {
       senderId: params.senderId,
     });
 
-    await sendDirectMessage(
-      accessToken,
-      platform.instagramId,
-      params.senderId,
-      username
-        ? `Connected @${username}. This Ongevia post is now linked to your workspace.`
-        : "Connected. This Ongevia post is now linked to your workspace."
+    const confirmation = username
+      ? `You're connected, @${username}. This post is linked to your Ongevia workspace — go back and continue your campaign.`
+      : "You're connected. This post is linked to your Ongevia workspace — go back and continue your campaign.";
+
+    // Instagram Login tokens may identify the page as user_id or id.
+    let senderAccountIds = [platform.instagramId];
+    try {
+      const me = await getUserInfo(accessToken);
+      senderAccountIds = [
+        ...new Set(
+          [platform.instagramId, me.user_id, me.id].filter(Boolean) as string[]
+        ),
+      ];
+    } catch {
+      // keep platform.instagramId only
+    }
+
+    let lastError: unknown = null;
+    for (const fromId of senderAccountIds) {
+      try {
+        await sendDirectMessage(
+          accessToken,
+          fromId,
+          params.senderId,
+          confirmation
+        );
+        confirmationSent = true;
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    if (!confirmationSent && lastError) {
+      console.warn(
+        "[post-claims] confirmation DM failed:",
+        lastError instanceof Error ? lastError.message : lastError
+      );
+    }
+  } catch (err) {
+    console.warn(
+      "[post-claims] verify side-effects failed:",
+      err instanceof Error ? err.message : err
     );
-  } catch {
-    // Verification still succeeds even if the confirmation DM fails.
   }
 
   await prisma.postClaim.update({
@@ -435,7 +484,132 @@ export async function tryVerifyPostClaimFromInboundDm(params: {
   return { verified: true, claimId: claim.id };
 }
 
-/** @deprecated Prefer inbound DM verification; kept for status polling helpers. */
+/**
+ * Webhooks often miss Instagram Login DMs. Scan recent conversations for the
+ * connect code and verify the pending claim when found.
+ */
+export async function checkPendingClaimFromRecentDms(params: {
+  workspaceId: string;
+  claimId: string;
+}): Promise<{
+  ok: boolean;
+  verified: boolean;
+  error?: string;
+  status?: number;
+  confirmationSent?: boolean;
+}> {
+  const claim = await prisma.postClaim.findFirst({
+    where: { id: params.claimId, workspaceId: params.workspaceId },
+  });
+  if (!claim) {
+    return { ok: false, verified: false, error: "Claim not found", status: 404 };
+  }
+  if (claim.status === "VERIFIED") {
+    return { ok: true, verified: true };
+  }
+  if (claim.status !== "PENDING") {
+    return {
+      ok: false,
+      verified: false,
+      error: "This claim is no longer pending. Get a new code.",
+      status: 400,
+    };
+  }
+  if (claim.expiresAt.getTime() <= Date.now()) {
+    await prisma.postClaim.update({
+      where: { id: claim.id },
+      data: { status: "EXPIRED" },
+    });
+    return {
+      ok: false,
+      verified: false,
+      error: "Code expired. Get a new connect code.",
+      status: 400,
+    };
+  }
+
+  const platform = await prisma.instagramAccount.findFirst({
+    where: { id: claim.instagramAccountId, isPlatformShared: true },
+  });
+  if (!platform) {
+    return {
+      ok: false,
+      verified: false,
+      error: "Shared Instagram page unavailable",
+      status: 404,
+    };
+  }
+
+  const accessToken = decryptToken(platform.accessToken);
+  let accountIds = [platform.instagramId];
+  try {
+    const me = await getUserInfo(accessToken);
+    accountIds = [
+      ...new Set(
+        [platform.instagramId, me.user_id, me.id].filter(Boolean) as string[]
+      ),
+    ];
+  } catch {
+    // keep db id
+  }
+
+  const selfIds = new Set(accountIds);
+  let scanned = 0;
+
+  for (const igId of accountIds) {
+    let conversations: Awaited<ReturnType<typeof getConversations>> = [];
+    try {
+      conversations = await getConversations(accessToken, igId);
+    } catch (err) {
+      console.warn(
+        "[post-claims] conversations list failed:",
+        igId,
+        err instanceof Error ? err.message : err
+      );
+      continue;
+    }
+
+    for (const convo of conversations.slice(0, 20)) {
+      let messages: Awaited<ReturnType<typeof getConversationMessages>> = [];
+      try {
+        messages = await getConversationMessages(accessToken, convo.id);
+      } catch {
+        continue;
+      }
+
+      for (const message of messages) {
+        scanned += 1;
+        const fromId = message.from?.id;
+        const text = message.message?.trim() ?? "";
+        if (!fromId || selfIds.has(fromId) || !text) continue;
+
+        const code = extractClaimCodeFromMessage(text);
+        if (!code) continue;
+        if (hashOtp(code) !== claim.codeHash) continue;
+
+        const result = await tryVerifyPostClaimFromInboundDm({
+          platformInstagramId: platform.instagramId,
+          senderId: fromId,
+          messageText: text,
+        });
+        if (result.verified) {
+          return { ok: true, verified: true };
+        }
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    verified: false,
+    error:
+      scanned === 0
+        ? `No DMs found yet. Message @${platform.username} with your code, wait a few seconds, then tap Check again.`
+        : `Code not found in recent DMs yet. Make sure you sent it to @${platform.username}, then tap Check again.`,
+  };
+}
+
+/** Status polling helper for the claim UI. */
 export async function getPostClaimStatus(params: {
   workspaceId: string;
   claimId: string;

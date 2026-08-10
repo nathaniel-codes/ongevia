@@ -6,6 +6,7 @@ import {
   getCurrentWorkspaceContext,
 } from "@/lib/workspace-access";
 import {
+  checkPendingClaimFromRecentDms,
   createPostClaim,
   getPostClaimStatus,
   listClaimsForWorkspace,
@@ -21,6 +22,11 @@ const createSchema = z
     message: "Provide a mediaId or postUrl",
     path: ["postUrl"],
   });
+
+const checkSchema = z.object({
+  claimId: z.string().min(1),
+  action: z.literal("check"),
+});
 
 export async function GET(request: NextRequest) {
   const context = await getCurrentWorkspaceContext();
@@ -58,6 +64,30 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
+
+  const checkParsed = checkSchema.safeParse(body);
+  if (checkParsed.success) {
+    const result = await checkPendingClaimFromRecentDms({
+      workspaceId: context.workspaceId,
+      claimId: checkParsed.data.claimId,
+    });
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error ?? "Check failed" },
+        { status: result.status ?? 400 }
+      );
+    }
+    return NextResponse.json({
+      success: true,
+      data: {
+        verified: result.verified,
+        message: result.verified
+          ? "Connected. Check Instagram for the confirmation DM."
+          : result.error,
+      },
+    });
+  }
+
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
