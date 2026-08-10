@@ -14,7 +14,7 @@ const flowSteps = [
     eyebrow: "Connect",
     title: "Link Instagram or collaborate",
     description:
-      "Sign in with your phone. Connect your own Instagram, or collaborate with @ongevia without OAuth.",
+      "Sign in with your phone. Connect your own Instagram, or collaborate with @ongeviadotcom without OAuth.",
   },
   {
     eyebrow: "Build",
@@ -32,7 +32,7 @@ const flowSteps = [
 
 const features = [
   "Phone OTP sign-in",
-  "Collaborate with @ongevia",
+  "Collaborate with @ongeviadotcom",
   "Connect your own Instagram",
   "Encrypted tokens at rest",
   "Webhook + polling reconciliation",
@@ -87,7 +87,7 @@ function OverviewPreview() {
         <div>
           <h3 className="text-base font-semibold text-foreground">Overview</h3>
           <p className="mt-1 text-xs text-muted">
-            Recent — 24 posts from @ongevia
+            Recent — 24 posts from @ongeviadotcom
           </p>
         </div>
         <span className="rounded border border-border px-2 py-1 text-xs text-muted">
@@ -164,7 +164,7 @@ function DashboardPreview() {
         <p className="text-xs text-white/70">Credit balance</p>
         <p className="mt-1 font-display text-3xl font-semibold">1,000 TZS</p>
         <p className="mt-2 text-xs text-white/80">
-          Default account · @ongevia
+          Default account · @ongeviadotcom
         </p>
       </div>
 
@@ -218,7 +218,7 @@ export default function Home() {
           <p className="mt-5 max-w-xl text-base leading-7 text-muted">
             Someone comments your keyword — they get your private reply through
             the official Meta API. Phone login, wallet credits, collaborate with
-            @ongevia.
+            @ongeviadotcom.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">

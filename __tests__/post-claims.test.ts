@@ -17,7 +17,7 @@ vi.mock("@/lib/instagram-accounts", () => ({
     id: "ig_shared",
     workspaceId: "ws_home",
     isPlatformShared: true,
-    username: "ongevia",
+    username: "ongeviadotcom",
   })),
 }));
 

@@ -139,7 +139,7 @@ export default function PostClaimPanel({
     pending?.platformUsername ??
     claims[0]?.instagramAccount.username ??
     process.env.NEXT_PUBLIC_PLATFORM_IG_USERNAME ??
-    "ongevia";
+    "ongeviadotcom";
 
   return (
     <div className={compact ? "space-y-3" : "space-y-4"}>

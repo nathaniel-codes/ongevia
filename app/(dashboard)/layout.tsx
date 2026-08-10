@@ -36,7 +36,7 @@ export default async function DashboardLayout({
     user.id,
     user.phone ?? user.email
   );
-  // Every workspace can use @ongevia for campaigns + overview analytics.
+  // Every workspace can use @ongeviadotcom for campaigns + overview analytics.
   await ensureWorkspaceCollaborating(workspace.id);
   const accounts = await listInstagramAccountsForWorkspace(workspace.id);
   const primary =

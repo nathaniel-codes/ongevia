@@ -8,7 +8,7 @@ import { getPlatformSharedAccount } from "@/lib/instagram-accounts";
 import { logAction } from "@/lib/action-log";
 
 /**
- * Auto-accept Instagram collaboration invites for the shared @ongevia
+ * Auto-accept Instagram collaboration invites for the shared @ongeviadotcom
  * account so users don't wait on a manual accept.
  */
 export async function GET(request: NextRequest) {
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         data: {
           accepted: 0,
           skipped: "collaboration_invites unavailable on this token type",
-          hint: "Accept invites in the Instagram app as @ongevia",
+          hint: "Accept invites in the Instagram app as @ongeviadotcom",
         },
       });
     }
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       errors,
       note:
         errors.length > 0
-          ? "If Meta returns nonexisting field, accept invites in the Instagram app on @ongevia for now."
+          ? "If Meta returns nonexisting field, accept invites in the Instagram app on @ongeviadotcom for now."
           : null,
     },
   });

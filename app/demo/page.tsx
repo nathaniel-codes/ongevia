@@ -44,7 +44,7 @@ export default function DemoDashboardPage() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/25 bg-accent/5 px-4 py-3 text-sm">
           <p className="text-foreground">
             <span className="font-semibold">Demo preview</span>
-            {" — "}sample @ongevia dashboard. No login, no real Instagram
+            {" — "}sample @ongeviadotcom dashboard. No login, no real Instagram
             connection.
           </p>
           <Link
@@ -57,7 +57,7 @@ export default function DemoDashboardPage() {
 
         <div className="mb-8">
           <h1 className="font-display text-3xl font-semibold tracking-tight">
-            Hello, @ongevia!
+            Hello, @ongeviadotcom!
           </h1>
           <p className="mt-1 text-sm text-muted">
             1 connected account · 248 contacts · sample activity

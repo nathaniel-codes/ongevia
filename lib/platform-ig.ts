@@ -7,8 +7,8 @@ export function platformIgUsername(): string {
     process.env.NEXT_PUBLIC_PLATFORM_IG_USERNAME ??
     process.env.PLATFORM_IG_USERNAME ??
     process.env.PLATFORM_INSTAGRAM_USERNAME ??
-    "ongevia";
-  return raw.trim().replace(/^@/, "").toLowerCase() || "ongevia";
+    "ongeviadotcom";
+  return raw.trim().replace(/^@/, "").toLowerCase() || "ongeviadotcom";
 }
 
 export function platformIgHandle(): string {

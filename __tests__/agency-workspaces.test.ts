@@ -100,7 +100,7 @@ describe("agency workspace helpers", () => {
       id: "platform_1",
       workspaceId: "platform_ws",
       isPlatformShared: true,
-      username: "ongevia",
+      username: "ongeviadotcom",
     };
     mockPrisma.instagramAccount.findFirst
       .mockResolvedValueOnce(null) // own account

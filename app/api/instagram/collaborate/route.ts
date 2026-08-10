@@ -27,7 +27,7 @@ export async function POST() {
     return NextResponse.json(
       {
         error:
-          "Ongevia shared page is not connected yet. Ask an admin to connect @ongevia and mark it shared.",
+          "Ongevia shared page is not connected yet. Ask an admin to connect @ongeviadotcom and mark it shared.",
       },
       { status: 404 }
     );
