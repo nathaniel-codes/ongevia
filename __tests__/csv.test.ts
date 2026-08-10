@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { parseCsv, instagramShortcode } from "../lib/utils/csv";
+import {
+  parseCsv,
+  instagramShortcode,
+  shortcodeMediaId,
+  parseShortcodeMediaId,
+  isShortcodeMediaId,
+} from "../lib/utils/csv";
 
 describe("parseCsv", () => {
   it("parses a simple file keyed by lowercased headers", () => {

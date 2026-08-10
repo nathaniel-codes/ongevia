@@ -10,7 +10,11 @@ import {
   getMediaById,
   sendDirectMessage,
 } from "@/lib/meta/client";
-import { instagramShortcode } from "@/lib/utils/csv";
+import {
+  instagramShortcode,
+  isShortcodeMediaId,
+  shortcodeMediaId,
+} from "@/lib/utils/csv";
 import { logAction } from "@/lib/action-log";
 
 /** User pastes this exact line into a DM to the shared Ongevia page. */
@@ -199,18 +203,32 @@ export async function createPostClaim(params: {
   }
 
   const accessToken = decryptToken(platform.accessToken);
-  const resolved = await resolveMediaOnPlatformAccount({
+  let resolved = await resolveMediaOnPlatformAccount({
     accessToken,
     platformInstagramId: platform.instagramId,
     mediaId: params.mediaId,
     postUrl: params.postUrl,
   });
+
+  // Instagram Login tokens cannot list collaborative_media. After the user
+  // accepts the collab invite in the app, claim by permalink shortcode instead.
   if (!resolved) {
-    return {
-      ok: false as const,
-      error:
-        `Post not found yet. Invite ${platformIgHandle()} as a collaborator on the Instagram post, wait for auto-accept, then paste the permalink again.`,
-      status: 400,
+    const shortcode = params.postUrl
+      ? instagramShortcode(params.postUrl)
+      : null;
+    if (!shortcode) {
+      return {
+        ok: false as const,
+        error:
+          `Could not read that Instagram link. Paste a full post/reel URL (instagram.com/p/… or /reel/…), after ${platformIgHandle()} is accepted as a collaborator.`,
+        status: 400,
+      };
+    }
+    resolved = {
+      mediaId: shortcodeMediaId(shortcode),
+      postUrl:
+        params.postUrl?.trim() ||
+        `https://www.instagram.com/p/${shortcode}/`,
     };
   }
 
@@ -585,4 +603,54 @@ export async function filterAutomationsByPlatformClaims<
       `${a.workspaceId}:${a.instagramAccount.id}:${a.postId}`
     );
   });
+}
+
+/**
+ * Instagram Login tokens cannot list collaborative_media, so claims often
+ * store `shortcode:…` until a real media id shows up (e.g. from a webhook).
+ * When we learn the Graph media id + permalink, rewrite claims & campaigns.
+ */
+export async function linkShortcodeClaimsToRealMedia(params: {
+  instagramAccountDbId: string;
+  mediaId: string;
+  accessToken: string;
+}): Promise<{ shortcode: string; permalink: string | null } | null> {
+  if (isShortcodeMediaId(params.mediaId)) return null;
+
+  let permalink: string | null = null;
+  try {
+    const media = await getMediaById(params.accessToken, params.mediaId);
+    permalink = media.permalink ?? null;
+  } catch {
+    return null;
+  }
+
+  const shortcode = permalink ? instagramShortcode(permalink) : null;
+  if (!shortcode) return null;
+
+  const key = shortcodeMediaId(shortcode);
+  await prisma.$transaction([
+    prisma.postClaim.updateMany({
+      where: {
+        instagramAccountId: params.instagramAccountDbId,
+        mediaId: key,
+      },
+      data: {
+        mediaId: params.mediaId,
+        ...(permalink ? { postUrl: permalink } : {}),
+      },
+    }),
+    prisma.automation.updateMany({
+      where: {
+        instagramAccountId: params.instagramAccountDbId,
+        postId: key,
+      },
+      data: {
+        postId: params.mediaId,
+        ...(permalink ? { postUrl: permalink } : {}),
+      },
+    }),
+  ]);
+
+  return { shortcode, permalink };
 }

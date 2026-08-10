@@ -30,6 +30,7 @@ const {
     },
     instagramAccount: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
     operationalEvent: {
       create: vi.fn(),
@@ -228,6 +229,7 @@ beforeEach(() => {
   mockPrisma.instagramAccount.findUnique.mockResolvedValue({
     workspaceId: "workspace_123",
   });
+  mockPrisma.instagramAccount.findFirst.mockResolvedValue(null);
   mockPrisma.operationalEvent.create.mockResolvedValue({});
   mockDecryptToken.mockReturnValue("decrypted_token");
   mockMatchKeywords.mockReturnValue({ matched: true, matchedKeyword: "LINK" });

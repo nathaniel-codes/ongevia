@@ -28,7 +28,8 @@ import {
 import { decryptToken } from "@/lib/meta/oauth";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
 import { reserveDMSlot } from "@/lib/utils/rate-limiter";
-import { filterAutomationsByPlatformClaims, tryVerifyPostClaimFromInboundDm } from "@/lib/post-claims";
+import { filterAutomationsByPlatformClaims, linkShortcodeClaimsToRealMedia, tryVerifyPostClaimFromInboundDm } from "@/lib/post-claims";
+import { isShortcodeMediaId } from "@/lib/utils/csv";
 import {
   releaseWorkspaceDMReservation,
   reserveWorkspaceDMSend,
@@ -199,6 +200,27 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     mediaId,
   } = job.data;
   const requeueAttempt = job.data.requeueAttempt ?? 0;
+
+  // Resolve shortcode-based collaborate claims/campaigns to the real media id
+  // once Meta delivers a comment (Instagram Login has no collaborative_media).
+  const platformAccount = await prisma.instagramAccount.findFirst({
+    where: { instagramId: instagramAccountId },
+    select: { id: true, accessToken: true, isPlatformShared: true },
+  });
+  if (platformAccount?.accessToken && !isShortcodeMediaId(mediaId)) {
+    try {
+      await linkShortcodeClaimsToRealMedia({
+        instagramAccountDbId: platformAccount.id,
+        mediaId,
+        accessToken: decryptToken(platformAccount.accessToken),
+      });
+    } catch (err) {
+      console.warn(
+        "[DM Worker] shortcode link skipped:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 
   const automations = await prisma.automation.findMany({
     where: {

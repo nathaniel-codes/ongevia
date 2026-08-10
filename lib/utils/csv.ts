@@ -82,6 +82,24 @@ function parseRows(text: string): string[][] {
  * does not look like an Instagram post URL.
  */
 export function instagramShortcode(value: string): string | null {
-  const match = value.match(/instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i);
+  const match = value.match(
+    /instagram\.com\/(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/i
+  );
   return match ? match[1] : null;
+}
+
+/** Prefix used when Meta cannot return a collaborative media id yet. */
+export const SHORTCODE_MEDIA_PREFIX = "shortcode:";
+
+export function shortcodeMediaId(shortcode: string): string {
+  return `${SHORTCODE_MEDIA_PREFIX}${shortcode}`;
+}
+
+export function parseShortcodeMediaId(mediaId: string): string | null {
+  if (!mediaId.startsWith(SHORTCODE_MEDIA_PREFIX)) return null;
+  return mediaId.slice(SHORTCODE_MEDIA_PREFIX.length) || null;
+}
+
+export function isShortcodeMediaId(mediaId: string | null | undefined): boolean {
+  return Boolean(mediaId && mediaId.startsWith(SHORTCODE_MEDIA_PREFIX));
 }

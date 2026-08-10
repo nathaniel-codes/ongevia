@@ -79,12 +79,7 @@ export async function getPlatformSharedAccount() {
     orderBy: { connectedAt: "desc" },
   });
   if (shared) {
-    if (shared.username.toLowerCase() !== preferred) {
-      return prisma.instagramAccount.update({
-        where: { id: shared.id },
-        data: { username: preferred },
-      });
-    }
+    // Keep the Instagram username Meta reports — do not overwrite with env alias.
     return shared;
   }
 

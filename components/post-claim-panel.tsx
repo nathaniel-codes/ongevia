@@ -149,7 +149,9 @@ export default function PostClaimPanel({
         </p>
         <p className="mt-1 text-xs text-muted">
           After @{platformHandle} is a collaborator on your Instagram post, paste
-          the permalink, then DM @{platformHandle}.
+          the permalink, then DM @{platformHandle}. You can get a connect code
+          right after accepting the invite — Meta does not always list collab
+          posts in the API.
         </p>
       </div>
 

@@ -35,6 +35,7 @@ import {
 } from "@/lib/meta/client";
 import { decryptToken } from "@/lib/meta/oauth";
 import { matchKeywords } from "@/lib/utils/keyword-matcher";
+import { isShortcodeMediaId } from "@/lib/utils/csv";
 
 // Only consider comments from the last few days — older ones are outside
 // Instagram's private-reply window anyway, so a DM to them would just fail.
@@ -161,6 +162,10 @@ async function sweepCampaign(
   // matches any post.
   const mediaIds: string[] = [];
   if (automation.postId) {
+    if (isShortcodeMediaId(automation.postId)) {
+      // Waiting for a webhook/comment to resolve shortcode → Graph media id.
+      return stat;
+    }
     mediaIds.push(automation.postId);
   } else if (automation.matchAnyPost) {
     try {
