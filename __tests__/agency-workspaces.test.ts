@@ -9,6 +9,7 @@ const { mockPrisma } = vi.hoisted(() => ({
     },
     platformSetting: {
       findUnique: vi.fn(),
+      upsert: vi.fn(),
     },
   },
 }));
@@ -92,6 +93,27 @@ describe("agency workspace helpers", () => {
       where: { workspaceId: "workspace_123" },
       orderBy: { connectedAt: "desc" },
     });
+  });
+
+  it("falls back to the platform shared account when the workspace has none", async () => {
+    const platform = {
+      id: "platform_1",
+      workspaceId: "platform_ws",
+      isPlatformShared: true,
+      username: "ongevia",
+    };
+    mockPrisma.instagramAccount.findFirst
+      .mockResolvedValueOnce(null) // own account
+      .mockResolvedValueOnce(platform); // getPlatformSharedAccount
+    mockPrisma.platformSetting.upsert.mockResolvedValue({
+      key: "workspace:workspace_123:collaborate",
+      value: platform.id,
+    });
+
+    await expect(
+      getWorkspaceInstagramAccount("workspace_123", "all")
+    ).resolves.toMatchObject({ id: "platform_1", isPlatformShared: true });
+    expect(mockPrisma.platformSetting.upsert).toHaveBeenCalled();
   });
 
   it("normalizes invitation phones and builds invite URLs", () => {

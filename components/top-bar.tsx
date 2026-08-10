@@ -7,6 +7,7 @@
  */
 
 import { usePathname } from "next/navigation";
+import ConnectInstagramButton from "@/components/connect-instagram-button";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -53,14 +54,7 @@ export default function TopBar({
             : `@${instagramUsername}`}
         </p>
       ) : (
-        <a
-          href="/api/instagram/connect"
-          className="shrink-0 whitespace-nowrap text-sm font-medium px-3 py-1.5 rounded bg-accent text-white hover:bg-accent-hover"
-        >
-          {/* Full label needs more room than a 360px header has to spare. */}
-          <span className="sm:hidden">Connect</span>
-          <span className="hidden sm:inline">Connect Instagram</span>
-        </a>
+        <ConnectInstagramButton responsive />
       )}
     </header>
   );

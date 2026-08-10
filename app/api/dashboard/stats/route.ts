@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId, getCurrentWorkspaceId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
-import { listInstagramAccountsForWorkspace } from "@/lib/instagram-accounts";
+import { listInstagramAccountsForWorkspace, ensureWorkspaceCollaborating } from "@/lib/instagram-accounts";
 import {
   calculateCtr,
   normalizeTopKeywords,
@@ -59,7 +59,9 @@ export async function GET(request: NextRequest) {
         dmsSentThisPeriod: true,
       },
     }),
-    listInstagramAccountsForWorkspace(workspaceId),
+    ensureWorkspaceCollaborating(workspaceId).then(() =>
+      listInstagramAccountsForWorkspace(workspaceId)
+    ),
     prisma.automation.count({ where: { workspaceId, ...accountFilter } }),
     prisma.automation.count({
       where: { workspaceId, isActive: true, ...accountFilter },
@@ -215,10 +217,6 @@ export async function GET(request: NextRequest) {
     creditsSpent = Math.abs(spent._sum.amount ?? 0);
   }
 
-  const collaborate = await prisma.platformSetting.findUnique({
-    where: { key: `workspace:${workspaceId}:collaborate` },
-  });
-
   return NextResponse.json({
     success: true,
     data: {
@@ -229,7 +227,7 @@ export async function GET(request: NextRequest) {
       instagramAccount: defaultAccount,
       instagramAccounts,
       selectedInstagramAccountId: selectedAccountId,
-      collaborating: Boolean(collaborate?.value),
+      collaborating: Boolean(platformAccount),
       platformUsername: platformAccount?.username ?? null,
       wallet: {
         balance: walletBalance,

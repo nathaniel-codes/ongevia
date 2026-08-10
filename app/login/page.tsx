@@ -20,14 +20,12 @@ export const metadata = {
 function loginRedirect(params: {
   error?: string;
   phone?: string;
-  name?: string;
   step?: string;
   callbackUrl?: string;
 }) {
   const q = new URLSearchParams();
   if (params.error) q.set("error", params.error);
   if (params.phone) q.set("phone", params.phone);
-  if (params.name) q.set("name", params.name);
   if (params.step) q.set("step", params.step);
   if (params.callbackUrl) q.set("callbackUrl", params.callbackUrl);
   redirect(`/login?${q.toString()}`);
@@ -41,7 +39,6 @@ export default async function LoginPage({
     template?: string;
     error?: string;
     phone?: string;
-    name?: string;
     step?: string;
   }>;
 }) {
@@ -59,26 +56,15 @@ export default async function LoginPage({
 
   const step = params.step === "otp" ? "otp" : "phone";
   const phone = params.phone ?? "";
-  const name = params.name ?? "";
 
   async function requestOtp(formData: FormData) {
     "use server";
     const phoneValue = String(formData.get("phone") ?? "");
-    const nameValue = String(formData.get("name") ?? "").trim();
     const normalized = normalizePhone(phoneValue);
     if (!normalized) {
       loginRedirect({
         error: "Enter a valid Tanzania phone number (e.g. 07XXXXXXXX).",
         phone: phoneValue,
-        name: nameValue,
-      });
-      return;
-    }
-    if (!nameValue || nameValue.length < 2) {
-      loginRedirect({
-        error: "Enter your name (at least 2 characters).",
-        phone: phoneValue,
-        name: nameValue,
       });
       return;
     }
@@ -91,7 +77,6 @@ export default async function LoginPage({
       loginRedirect({
         error: "This account is suspended.",
         phone: phoneValue,
-        name: nameValue,
       });
       return;
     }
@@ -101,7 +86,6 @@ export default async function LoginPage({
       loginRedirect({
         error: gate.error,
         phone: phoneValue,
-        name: nameValue,
       });
       return;
     }
@@ -120,7 +104,6 @@ export default async function LoginPage({
       loginRedirect({
         error: "Could not send SMS. Try again shortly.",
         phone: phoneValue,
-        name: nameValue,
       });
       return;
     }
@@ -134,7 +117,6 @@ export default async function LoginPage({
     loginRedirect({
       step: "otp",
       phone: phoneValue,
-      name: nameValue,
       callbackUrl,
     });
   }
@@ -142,14 +124,13 @@ export default async function LoginPage({
   async function verifyOtp(formData: FormData) {
     "use server";
     const phoneValue = String(formData.get("phone") ?? "");
-    const nameValue = String(formData.get("name") ?? "").trim();
     const code = String(formData.get("code") ?? "");
 
     try {
       await signIn("phone-otp", {
         phone: phoneValue,
         code,
-        name: nameValue,
+        name: "",
         redirectTo: callbackUrl,
       });
     } catch (err) {
@@ -164,7 +145,6 @@ export default async function LoginPage({
       loginRedirect({
         step: "otp",
         phone: phoneValue,
-        name: nameValue,
         error:
           "Could not sign in. Check the code, or request a new one and try again.",
         callbackUrl,
@@ -173,19 +153,19 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
+    <div className="flex min-h-screen items-center justify-center px-6">
       <div className="w-full max-w-md animate-fade-in">
-        <div className="text-center mb-8">
+        <div className="mb-8 text-center">
           <Link
             href="/"
-            className="font-display text-4xl font-semibold text-foreground tracking-tight"
+            className="font-display text-4xl font-semibold tracking-tight text-foreground"
           >
             Ongevia
           </Link>
-          <p className="text-muted text-sm leading-relaxed mt-3">
+          <p className="mt-3 text-sm leading-relaxed text-muted">
             {selectedTemplate
               ? `Sign in to use the ${selectedTemplate.title} template.`
-              : "Sign in with your phone, then connect your Instagram professional account."}
+              : "Sign in with your phone number. We’ll text you a one-time code."}
           </p>
         </div>
 
@@ -201,7 +181,6 @@ export default async function LoginPage({
           {step === "otp" ? (
             <form action={verifyOtp} className="space-y-5">
               <input type="hidden" name="phone" value={phone} />
-              <input type="hidden" name="name" value={name} />
               <p className="text-sm text-muted">
                 Enter the 6-digit code sent to{" "}
                 <span className="font-medium text-foreground">{phone}</span>
@@ -229,7 +208,7 @@ export default async function LoginPage({
                 Verify & sign in
               </button>
               <Link
-                href={`/login?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`}
+                href={`/login?phone=${encodeURIComponent(phone)}`}
                 className="block text-center text-sm text-muted hover:text-foreground"
               >
                 Resend or use a different number
@@ -237,22 +216,6 @@ export default async function LoginPage({
             </form>
           ) : (
             <form action={requestOtp} className="space-y-5">
-              <div className="space-y-2">
-                <label htmlFor="name" className="block text-sm font-medium">
-                  Your name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  minLength={2}
-                  maxLength={80}
-                  defaultValue={name}
-                  placeholder="e.g. Nathaniel"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                />
-              </div>
               <div className="space-y-2">
                 <label htmlFor="phone" className="block text-sm font-medium">
                   Phone number

@@ -138,6 +138,7 @@ export default function PostClaimPanel({
   const platformHandle =
     pending?.platformUsername ??
     claims[0]?.instagramAccount.username ??
+    process.env.NEXT_PUBLIC_PLATFORM_IG_USERNAME ??
     "ongevia";
 
   return (
@@ -148,8 +149,7 @@ export default function PostClaimPanel({
         </p>
         <p className="mt-1 text-xs text-muted">
           After @{platformHandle} is a collaborator on your Instagram post, paste
-          the permalink, then DM @{platformHandle} the connect code. That proves
-          the post is yours and locks it to this workspace.
+          the permalink, then DM @{platformHandle}.
         </p>
       </div>
 

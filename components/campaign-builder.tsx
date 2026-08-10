@@ -653,7 +653,7 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. YC referral"
+            placeholder="e.g. Weekend drop replies"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
             maxLength={100}
           />

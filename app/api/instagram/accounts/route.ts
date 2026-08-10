@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentWorkspaceId } from "@/lib/auth";
-import { listInstagramAccountsForWorkspace } from "@/lib/instagram-accounts";
-import { prisma } from "@/lib/db/client";
+import {
+  ensureWorkspaceCollaborating,
+  listInstagramAccountsForWorkspace,
+} from "@/lib/instagram-accounts";
 
 export const runtime = "nodejs";
 
@@ -14,10 +16,9 @@ export async function GET() {
     );
   }
 
+  const { collaborating, platform } =
+    await ensureWorkspaceCollaborating(workspaceId);
   const accounts = await listInstagramAccountsForWorkspace(workspaceId);
-  const collaborate = await prisma.platformSetting.findUnique({
-    where: { key: `workspace:${workspaceId}:collaborate` },
-  });
 
   return NextResponse.json({
     success: true,
@@ -31,8 +32,9 @@ export async function GET() {
         ownedByWorkspace: a.workspaceId === workspaceId,
       })),
       selectedInstagramAccountId: accounts[0]?.id ?? null,
-      collaborating: Boolean(collaborate?.value),
-      collaborateAccountId: collaborate?.value ?? null,
+      collaborating,
+      collaborateAccountId: platform?.id ?? null,
+      platformUsername: platform?.username ?? null,
     },
   });
 }

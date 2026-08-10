@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import type { AccountOption } from "@/components/account-select";
 import { InstagramConnectNotice } from "@/components/instagram-connect-notice";
 import CollaborateGuide from "@/components/collaborate-guide";
+import ConnectInstagramButton from "@/components/connect-instagram-button";
+import { platformIgHandle } from "@/lib/platform-ig";
 
 interface SettingsData {
   workspace: {
@@ -58,7 +60,6 @@ export default function SettingsPage() {
   const [invitePhone, setInvitePhone] = useState("");
   const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER">("MEMBER");
   const [memberError, setMemberError] = useState<string | null>(null);
-  const [collaborating, setCollaborating] = useState(false);
   const [platformUsername, setPlatformUsername] = useState<string | null>(null);
   const [collabError, setCollabError] = useState<string | null>(null);
 
@@ -72,12 +73,19 @@ export default function SettingsPage() {
         if (statsPayload.success) setData(statsPayload.data);
         if (membersPayload.success) setMembersData(membersPayload.data);
         if (accountsPayload.success) {
-          setCollaborating(Boolean(accountsPayload.data?.collaborating));
-          const shared = (accountsPayload.data?.instagramAccounts ?? []).find(
-            (a: { isPlatformShared?: boolean; username?: string }) =>
-              a.isPlatformShared
+          setPlatformUsername(
+            accountsPayload.data?.platformUsername ??
+              (accountsPayload.data?.instagramAccounts ?? []).find(
+                (a: { isPlatformShared?: boolean; username?: string }) =>
+                  a.isPlatformShared
+              )?.username ??
+              null
           );
-          setPlatformUsername(shared?.username ?? null);
+          if (!accountsPayload.data?.collaborating) {
+            setCollabError(
+              `Shared ${platformIgHandle()} page is not connected yet. Ask an admin.`
+            );
+          }
         }
       })
       .finally(() => setLoading(false));
@@ -233,12 +241,14 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-6 pt-4 border-t border-border flex flex-wrap gap-3">
-          <a
-            href="/api/instagram/connect"
+          <ConnectInstagramButton
+            label={
+              accounts.length > 0
+                ? "Connect another account"
+                : "Connect my Instagram"
+            }
             className="px-4 py-2 rounded text-sm font-medium transition-colors bg-accent text-white hover:bg-accent-hover"
-          >
-            {accounts.length > 0 ? "Connect another account" : "Connect my Instagram"}
-          </a>
+          />
           <button
             type="button"
             onClick={async () => {
@@ -253,39 +263,14 @@ export default function SettingsPage() {
           </button>
         </div>
         <p className="mt-3 text-xs text-muted">
-          Connect your own Instagram to send DMs from your page. Prefer not to
-          OAuth? Use Collaborate below — replies come from @ongeviadotcom.
+          Connecting your own Instagram is coming soon. For now use{" "}
+          {platformIgHandle()} below — already available on every workspace.
         </p>
       </section>
 
       <CollaborateGuide
-        collaborating={collaborating}
         platformUsername={platformUsername}
-        busy={busy === "collaborate"}
         error={collabError}
-        onEnable={async () => {
-          setBusy("collaborate");
-          setCollabError(null);
-          const res = await fetch("/api/instagram/collaborate", {
-            method: "POST",
-          });
-          const payload = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            setCollabError(payload.error ?? "Collaborate unavailable");
-          } else {
-            setCollaborating(true);
-            setPlatformUsername(payload.data?.username ?? platformUsername);
-            window.location.reload();
-          }
-          setBusy(null);
-        }}
-        onDisable={async () => {
-          setBusy("collaborate");
-          await fetch("/api/instagram/collaborate", { method: "DELETE" });
-          setCollaborating(false);
-          setBusy(null);
-          window.location.reload();
-        }}
       />
 
       <section className="panel rounded p-4 sm:p-6">

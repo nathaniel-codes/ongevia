@@ -43,7 +43,7 @@ npm ci --include=dev
 export PATH="$APP_DIR/node_modules/.bin:$PATH"
 npx prisma generate
 npx prisma migrate deploy
-# Ensure admin + @ongeviadotcom platform account from env (no wipe)
+# Ensure admin + @ongevia platform account from env (no wipe)
 npx tsx scripts/bootstrap-platform.ts || true
 npm run build
 

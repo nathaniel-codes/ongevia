@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentWorkspaceId } from "@/lib/auth";
-import { prisma } from "@/lib/db/client";
-import { getWorkspaceInstagramAccount } from "@/lib/instagram-accounts";
+import {
+  getWorkspaceInstagramAccount,
+  listInstagramAccountsForWorkspace,
+} from "@/lib/instagram-accounts";
 import {
   getAllUserMedia,
   getMediaInsights,
@@ -65,8 +67,8 @@ export interface OverviewPost {
 }
 
 export interface OverviewResponse {
-  account: { id: string; username: string };
-  accounts: Array<{ id: string; username: string }>;
+  account: { id: string; username: string; isPlatformShared?: boolean };
+  accounts: Array<{ id: string; username: string; isPlatformShared?: boolean }>;
   requestedCount: "all" | number;
   truncated: boolean;
   insightsAvailable: boolean;
@@ -115,7 +117,8 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error:
-          "Instagram account not connected. Please connect your account first.",
+          "No Instagram account available yet. You can use @ongevia from Overview once the shared page is connected, or connect your own Instagram.",
+        code: "no_account",
       },
       { status: 400 }
     );
@@ -210,11 +213,12 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const accounts = await prisma.instagramAccount.findMany({
-      where: { workspaceId },
-      orderBy: { connectedAt: "desc" },
-      select: { id: true, username: true },
-    });
+    const listed = await listInstagramAccountsForWorkspace(workspaceId);
+    const accounts = listed.map((a) => ({
+      id: a.id,
+      username: a.username,
+      isPlatformShared: a.isPlatformShared,
+    }));
 
     // Followers is a point-in-time figure and deliberately not part of
     // `totals`, which sums over the selected posts. A failure here must not
@@ -235,7 +239,11 @@ export async function GET(request: NextRequest) {
     }
 
     const data: OverviewResponse = {
-      account: { id: account.id, username: account.username },
+      account: {
+        id: account.id,
+        username: account.username,
+        isPlatformShared: account.isPlatformShared,
+      },
       accounts,
       requestedCount,
       truncated,

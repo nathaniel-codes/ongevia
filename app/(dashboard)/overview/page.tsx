@@ -12,6 +12,8 @@ import { useEffect, useState } from "react";
 import AccountSelect from "@/components/account-select";
 import StatCard from "@/components/stat-card";
 import FollowerChart from "@/components/follower-chart";
+import ConnectInstagramButton from "@/components/connect-instagram-button";
+import { platformIgHandle } from "@/lib/platform-ig";
 import type { OverviewResponse } from "@/app/api/instagram/overview/route";
 
 function formatNumber(n: number | null): string {
@@ -86,16 +88,39 @@ export default function OverviewPage() {
 
   if (error) {
     return (
-      <div className="panel rounded p-8 text-center">
+      <div className="panel mx-auto max-w-lg rounded-xl p-8 text-center">
         <p className="text-sm text-error">{error}</p>
-        {error.includes("connect") && (
+        <div className="mt-5 space-y-3 text-left text-sm text-muted">
+          <p className="font-medium text-foreground">
+            Overview needs an Instagram page first:
+          </p>
+          <ol className="list-decimal space-y-2 pl-5">
+            <li>
+              <span className="font-medium text-foreground">
+                {platformIgHandle()}
+              </span>{" "}
+              — already available on your workspace. Refresh this page for shared
+              analytics, or claim a post in Settings to run campaigns.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Your Instagram</span> —
+              connect a professional account to see that page’s analytics here
+              instead (coming soon).
+            </li>
+          </ol>
+        </div>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
           <a
-            href="/api/instagram/connect"
-            className="mt-4 inline-block text-sm text-accent hover:underline"
+            href="/settings"
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover"
           >
-            Connect Instagram
+            Open Settings
           </a>
-        )}
+          <ConnectInstagramButton
+            label="Connect my Instagram"
+            className="rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-surface-hover"
+          />
+        </div>
       </div>
     );
   }
@@ -114,6 +139,9 @@ export default function OverviewPage() {
             {data.requestedCount === "all" ? "All-time" : "Recent"} —{" "}
             {totals.posts} post{totals.posts === 1 ? "" : "s"} from @
             {data.account.username}
+            {data.account.isPlatformShared
+              ? " (Ongevia shared · collaborate)"
+              : ""}
             {data.truncated ? ` (capped at ${totals.posts})` : ""}
           </p>
           {followers !== null && (
@@ -162,14 +190,12 @@ export default function OverviewPage() {
           </p>
           <p className="text-sm text-muted mt-1">
             Reconnect your account to grant it — likes and comments are shown in
-            the meantime.
+            the meantime. Own Instagram connect is coming soon.
           </p>
-          <a
-            href="/api/instagram/connect"
+          <ConnectInstagramButton
+            label="Reconnect Instagram"
             className="mt-3 inline-block text-sm text-accent hover:underline"
-          >
-            Reconnect Instagram
-          </a>
+          />
         </div>
       )}
 

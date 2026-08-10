@@ -4,7 +4,7 @@
  * Env (on VPS in /etc/ongevia/.env):
  *   ADMIN_EMAIL, ADMIN_PASSWORD
  *   PLATFORM_IG_ACCESS_TOKEN, PLATFORM_IG_USER_ID
- *   PLATFORM_IG_USERNAME (default ongeviadotcom)
+ *   PLATFORM_IG_USERNAME (default ongevia)
  *   CREDITS_PER_1000_TZS, DM_CREDIT_COST, SIGNUP_BONUS_CREDITS
  *
  * Wipe all app data first:
@@ -90,7 +90,7 @@ async function seedPlatformInstagram(workspaceId: string) {
   const username = (
     process.env.PLATFORM_IG_USERNAME ??
     process.env.PLATFORM_INSTAGRAM_USERNAME ??
-    "ongeviadotcom"
+    "ongevia"
   )
     .trim()
     .replace(/^@/, "")

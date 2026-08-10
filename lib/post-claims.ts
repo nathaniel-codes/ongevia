@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { generateOtpCode, hashOtp } from "@/lib/phone";
 import { getPlatformSharedAccount } from "@/lib/instagram-accounts";
+import { platformIgHandle } from "@/lib/platform-ig";
 import { decryptToken } from "@/lib/meta/oauth";
 import {
   getAllUserMedia,
@@ -27,10 +28,11 @@ const CLAIM_OTP_TTL_MS = 30 * 60 * 1000;
 export async function isWorkspaceCollaborating(
   workspaceId: string
 ): Promise<boolean> {
-  const setting = await prisma.platformSetting.findUnique({
-    where: { key: `workspace:${workspaceId}:collaborate` },
-  });
-  return Boolean(setting?.value);
+  void workspaceId;
+  const platform = await getPlatformSharedAccount();
+  if (!platform?.isPlatformShared) return false;
+  // Collaborate is on by default for every workspace.
+  return true;
 }
 
 export async function getVerifiedClaim(
@@ -101,7 +103,7 @@ export async function assertCanAutomatePlatformPost(params: {
   if (!(await isWorkspaceCollaborating(params.workspaceId))) {
     return {
       ok: false,
-      error: "Enable Collaborate via Ongevia page in Settings first",
+      error: `Shared Ongevia page is not available yet. Ask an admin to connect ${platformIgHandle()}.`,
       status: 403,
     };
   }
@@ -191,7 +193,7 @@ export async function createPostClaim(params: {
   if (platform.workspaceId !== params.workspaceId && !collaborating) {
     return {
       ok: false as const,
-      error: "Enable Collaborate via Ongevia page in Settings first",
+      error: `Shared Ongevia page is not available yet. Ask an admin to connect ${platformIgHandle()}.`,
       status: 403,
     };
   }
@@ -207,7 +209,7 @@ export async function createPostClaim(params: {
     return {
       ok: false as const,
       error:
-        "Post not found yet. Invite @ongeviadotcom as a collaborator on the Instagram post, wait for auto-accept, then paste the permalink again.",
+        `Post not found yet. Invite ${platformIgHandle()} as a collaborator on the Instagram post, wait for auto-accept, then paste the permalink again.`,
       status: 400,
     };
   }

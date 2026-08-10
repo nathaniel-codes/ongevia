@@ -6,27 +6,15 @@ import PublicSiteHeader from "@/components/public-site-header";
 export const metadata: Metadata = {
   title: "Ongevia — Instagram comment-to-DM automation",
   description:
-    "A free, self-hosted ManyChat alternative. Turn Instagram keyword comments into automatic private replies using the official Meta API.",
+    "Turn Instagram keyword comments into automatic private replies using the official Meta API. Phone login and wallet credits.",
 };
-
-const GITHUB_URL = "https://github.com/diwenne/ongevia";
-
-function formatStars(count: number): string {
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`;
-  }
-  return count.toLocaleString();
-}
-
-const githubIconPath =
-  "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z";
 
 const flowSteps = [
   {
     eyebrow: "Connect",
-    title: "Link your Instagram professional account",
+    title: "Link Instagram or collaborate",
     description:
-      "Sign in with your phone and connect Instagram once. No password sharing, no browser automation.",
+      "Sign in with your phone. Connect your own Instagram, or collaborate with @ongevia without OAuth.",
   },
   {
     eyebrow: "Build",
@@ -38,28 +26,25 @@ const flowSteps = [
     eyebrow: "Deliver",
     title: "Replies go out through the official API",
     description:
-      "Webhooks catch comments instantly and a polling sweep catches the ones Instagram never pushes, so nothing is missed. Every send is queued, rate-limited, and logged.",
+      "Webhooks catch comments instantly and a polling sweep catches the ones Instagram never pushes. Every send is queued, rate-limited, and logged.",
   },
 ];
 
 const features = [
   "Phone OTP sign-in",
-  "Multiple Instagram accounts",
+  "Collaborate with @ongevia",
+  "Connect your own Instagram",
   "Encrypted tokens at rest",
   "Webhook + polling reconciliation",
   "Queue-backed delivery worker",
-  "Per-account rate limiting",
+  "Wallet credits via mobile money",
   "Tracked links with click stats",
   "DM logs with full status",
-  "Wallet credits via mobile money",
 ];
-
-/* Static, faithful copies of the real Overview and Dashboard screens, built in
-   the app's own design tokens so what visitors see is what the app looks like. */
 
 function AppWindow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background shadow-2xl shadow-black/50">
+    <div className="overflow-hidden rounded-xl border border-border bg-background shadow-lg shadow-black/10">
       <div className="flex items-center gap-2 border-b border-border bg-surface px-4 py-3">
         <span className="h-2.5 w-2.5 rounded-full bg-border" />
         <span className="h-2.5 w-2.5 rounded-full bg-border" />
@@ -73,7 +58,7 @@ function AppWindow({ label, children }: { label: string; children: ReactNode }) 
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border border-border bg-surface p-4">
+    <div className="rounded-lg border border-border bg-surface p-4">
       <p className="text-sm text-muted">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
     </div>
@@ -102,7 +87,7 @@ function OverviewPreview() {
         <div>
           <h3 className="text-base font-semibold text-foreground">Overview</h3>
           <p className="mt-1 text-xs text-muted">
-            Recent — 24 posts from @studio.store
+            Recent — 24 posts from @ongevia
           </p>
         </div>
         <span className="rounded border border-border px-2 py-1 text-xs text-muted">
@@ -116,56 +101,25 @@ function OverviewPreview() {
         ))}
       </div>
 
-      <div className="mt-4 rounded border border-border bg-surface p-4">
+      <div className="mt-4 rounded-lg border border-border bg-surface p-4">
         <div className="flex items-baseline justify-between">
-          <p className="text-sm font-semibold text-foreground">
-            Followers over time
-          </p>
-          <p className="text-xs text-muted">
-            48,210 <span className="text-success">+1,240</span> · 30d
-          </p>
+          <p className="text-sm font-semibold text-foreground">Top posts</p>
+          <span className="text-xs text-muted">Views · Saves</span>
         </div>
-        <svg
-          viewBox="0 0 300 64"
-          preserveAspectRatio="none"
-          className="mt-3 h-16 w-full"
-          aria-hidden="true"
-        >
-          <polyline
-            points="0,54 43,49 86,51 129,40 171,36 214,26 257,20 300,9"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-            className="text-accent"
-          />
-        </svg>
-      </div>
-
-      <div className="mt-4 rounded border border-border bg-surface p-4">
-        <p className="text-sm font-semibold text-foreground">Posts</p>
-        <table className="mt-3 w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-zinc-500">
-              <th className="pb-2 pr-3 font-medium">Post</th>
-              <th className="pb-2 px-3 text-right font-medium">Views</th>
-              <th className="pb-2 px-3 text-right font-medium">Likes</th>
-              <th className="pb-2 pl-3 text-right font-medium">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {overviewPosts.map(([post, views, likes, date]) => (
-              <tr key={post} className="border-b border-border last:border-0">
-                <td className="py-2 pr-3 text-foreground">{post}</td>
-                <td className="py-2 px-3 text-right text-muted">{views}</td>
-                <td className="py-2 px-3 text-right text-muted">{likes}</td>
-                <td className="py-2 pl-3 text-right text-zinc-500">{date}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="mt-3 space-y-2">
+          {overviewPosts.map(([title, views, saves, date]) => (
+            <div
+              key={title}
+              className="flex items-center justify-between gap-3 border-b border-border py-2 text-sm last:border-0"
+            >
+              <span className="truncate text-foreground">{title}</span>
+              <span className="shrink-0 text-muted">
+                {views} · {saves}
+              </span>
+              <span className="shrink-0 text-xs text-muted">{date}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </AppWindow>
   );
@@ -173,29 +127,23 @@ function OverviewPreview() {
 
 function MatchedCommentCard() {
   return (
-    <div className="w-64 rounded-lg border border-border bg-surface p-4 shadow-2xl shadow-black/50">
-      <p className="text-xs text-muted">New comment</p>
-      <p className="mt-1 text-sm font-semibold text-foreground">@maya.co</p>
-      <p className="mt-1 text-sm text-muted">LINK please</p>
-      <div className="mt-3 border-t border-border pt-3">
-        <p className="text-xs text-muted">
-          Matched <span className="text-accent">GUIDE</span>
-        </p>
-        <p className="mt-1 text-sm font-medium text-success">
-          Queued private reply
-        </p>
-      </div>
+    <div className="w-72 rounded-xl border border-border bg-surface p-4 shadow-lg">
+      <p className="text-xs font-medium uppercase tracking-wide text-accent">
+        Keyword matched
+      </p>
+      <p className="mt-2 text-sm text-foreground">
+        <span className="font-semibold">@shop.ava</span> commented{" "}
+        <span className="font-medium text-accent">PRICE</span>
+      </p>
+      <p className="mt-2 text-xs text-muted">DM queued · public reply sent</p>
     </div>
   );
 }
 
 const dashboardStats = [
-  ["Active Campaigns", "8"],
-  ["DMs Sent", "1,284"],
-  ["Skipped", "42"],
-  ["Failed", "3"],
-  ["Clicks", "356"],
-  ["CTR", "27.7%"],
+  ["Active", "12"],
+  ["DMs Sent", "534"],
+  ["CTR", "18%"],
 ];
 
 const dashboardChart: [string, number][] = [
@@ -208,18 +156,24 @@ const dashboardChart: [string, number][] = [
   ["Sun", 73],
 ];
 
-const dashboardActivity = [
-  ["@maya.co", "Product guide reply", "Sent", "text-success"],
-  ["@founder.ray", "Price request", "Sent", "text-success"],
-  ["@shop.ava", "Lead magnet", "Queued", "text-warning"],
-];
-
 function DashboardPreview() {
   const maxDM = Math.max(...dashboardChart.map(([, n]) => n));
   return (
     <AppWindow label="app / dashboard">
-      <h3 className="text-base font-semibold text-foreground">Hello, Maya!</h3>
-      <p className="mt-1 text-xs text-muted">2 connected accounts · 340 contacts</p>
+      <div className="rounded-xl bg-gradient-to-br from-[#0f766e] via-[#0d5f59] to-[#0a3d3a] p-4 text-white">
+        <p className="text-xs text-white/70">Credit balance</p>
+        <p className="mt-1 font-display text-3xl font-semibold">1,000 TZS</p>
+        <p className="mt-2 text-xs text-white/80">
+          Default account · @ongevia
+        </p>
+      </div>
+
+      <h3 className="mt-4 text-base font-semibold text-foreground">
+        Hello, there!
+      </h3>
+      <p className="mt-1 text-xs text-muted">
+        1 connected account · collaborate ready
+      </p>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
         {dashboardStats.map(([label, value]) => (
@@ -227,9 +181,9 @@ function DashboardPreview() {
         ))}
       </div>
 
-      <div className="mt-4 rounded border border-border bg-surface p-4">
+      <div className="mt-4 rounded-lg border border-border bg-surface p-4">
         <p className="text-sm font-semibold text-foreground">DMs — Last 7 Days</p>
-        <div className="mt-4 flex h-32 items-end gap-2">
+        <div className="mt-4 flex h-28 items-end gap-2">
           {dashboardChart.map(([day, n]) => (
             <div key={day} className="flex flex-1 flex-col items-center gap-2">
               <span className="text-[10px] text-muted">{n}</span>
@@ -237,23 +191,7 @@ function DashboardPreview() {
                 className="w-full rounded-sm bg-accent"
                 style={{ height: `${Math.max((n / maxDM) * 100, 4)}%` }}
               />
-              <span className="text-[10px] text-zinc-500">{day}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-4 rounded border border-border bg-surface p-4">
-        <p className="text-sm font-semibold text-foreground">Recent Activity</p>
-        <div className="mt-3 space-y-2">
-          {dashboardActivity.map(([user, automation, status, color]) => (
-            <div
-              key={user}
-              className="flex items-center justify-between gap-3 border-b border-border py-2 text-sm last:border-0"
-            >
-              <span className="truncate text-foreground">{user}</span>
-              <span className="truncate text-muted">{automation}</span>
-              <span className={`text-sm ${color}`}>{status}</span>
+              <span className="text-[10px] text-muted">{day}</span>
             </div>
           ))}
         </div>
@@ -262,27 +200,12 @@ function DashboardPreview() {
   );
 }
 
-async function getGitHubStars(): Promise<number | null> {
-  try {
-    const res = await fetch("https://api.github.com/repos/diwenne/ongevia", {
-      headers: { Accept: "application/vnd.github+json" },
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { stargazers_count?: number };
-    return typeof data.stargazers_count === "number" ? data.stargazers_count : null;
-  } catch {
-    return null;
-  }
-}
-
-export default async function Home() {
-  const stars = await getGitHubStars();
+export default function Home() {
   return (
     <main className="min-h-screen">
       <PublicSiteHeader active="home" />
 
-      <section className="relative mx-auto grid w-full max-w-6xl items-center gap-10 px-5 pb-16 pt-16 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:pb-24 animate-fade-in">
+      <section className="relative mx-auto grid w-full max-w-6xl animate-fade-in items-center gap-10 px-5 pb-16 pt-16 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:pb-24">
         <div className="max-w-3xl">
           <p className="font-display text-5xl font-semibold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
             Ongevia
@@ -294,8 +217,8 @@ export default async function Home() {
 
           <p className="mt-5 max-w-xl text-base leading-7 text-muted">
             Someone comments your keyword — they get your private reply through
-            the official Meta API. Phone login, wallet top-ups, self-hosted on
-            your VPS.
+            the official Meta API. Phone login, wallet credits, collaborate with
+            @ongevia.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -305,17 +228,12 @@ export default async function Home() {
             >
               Get started
             </Link>
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted transition hover:text-foreground"
+            <Link
+              href="/demo"
+              className="inline-flex items-center justify-center rounded-lg border border-border px-5 py-3 text-sm font-semibold text-muted transition hover:text-foreground"
             >
-              <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4 fill-current">
-                <path d={githubIconPath} />
-              </svg>
-              {stars !== null ? formatStars(stars) : "GitHub"}
-            </a>
+              See demo
+            </Link>
           </div>
         </div>
 
@@ -330,14 +248,16 @@ export default async function Home() {
       <section id="how" className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-6 lg:px-8">
         <div className="grid gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-center">
           <div>
-            <p className="text-sm font-bold uppercase text-orange-600">How it works</p>
-            <h2 className="mt-3 text-4xl font-black leading-tight text-zinc-900 sm:text-5xl">
+            <p className="text-sm font-semibold uppercase tracking-wide text-accent">
+              How it works
+            </p>
+            <h2 className="mt-3 font-display text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
               A comment in, a DM out
             </h2>
-            <p className="mt-5 text-base leading-8 text-zinc-600">
-              Three steps. Connect an account, build a campaign, and let it run.
-              The webhook handles it live and the poll sweeps up whatever the
-              webhook misses.
+            <p className="mt-5 text-base leading-8 text-muted">
+              Three steps. Connect or collaborate, build a campaign, and let it
+              run. The webhook handles it live and the poll sweeps up whatever
+              the webhook misses.
             </p>
           </div>
 
@@ -345,12 +265,16 @@ export default async function Home() {
             {flowSteps.map((step) => (
               <article
                 key={step.title}
-                className="grid gap-4 border border-zinc-200 bg-zinc-50 p-5 sm:grid-cols-[120px_1fr]"
+                className="grid gap-4 rounded-xl border border-border bg-surface p-5 sm:grid-cols-[120px_1fr]"
               >
-                <p className="text-sm font-bold text-orange-600">{step.eyebrow}</p>
+                <p className="text-sm font-semibold text-accent">{step.eyebrow}</p>
                 <div>
-                  <h3 className="text-xl font-bold text-zinc-900">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-zinc-600">{step.description}</p>
+                  <h3 className="text-xl font-semibold text-foreground">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-muted">
+                    {step.description}
+                  </p>
                 </div>
               </article>
             ))}
@@ -358,32 +282,39 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="border-y border-zinc-200 bg-zinc-50 py-20">
-        <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:px-8 lg:items-center">
+      <section className="border-y border-border bg-surface/60 py-20">
+        <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:px-8">
           <DashboardPreview />
 
           <div>
-            <p className="text-sm font-bold uppercase text-orange-600">The dashboard</p>
-            <h2 className="mt-3 text-4xl font-black leading-tight text-zinc-900 sm:text-5xl">
-              See exactly what happened
+            <p className="text-sm font-semibold uppercase tracking-wide text-accent">
+              The dashboard
+            </p>
+            <h2 className="mt-3 font-display text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
+              Balance, account, and what happened
             </h2>
-            <p className="mt-5 text-base leading-8 text-zinc-600">
-              Every comment event is traceable: queued, matched, sent, skipped,
-              failed, or rate-limited. No black box.
+            <p className="mt-5 text-base leading-8 text-muted">
+              See your wallet credits, default Instagram account, and every DM
+              event: queued, matched, sent, skipped, or failed.
             </p>
           </div>
         </div>
       </section>
 
-      <section id="features" className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-6 lg:px-8">
+      <section
+        id="features"
+        className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-6 lg:px-8"
+      >
         <div className="max-w-2xl">
-          <p className="text-sm font-bold uppercase text-orange-600">What&rsquo;s included</p>
-          <h2 className="mt-3 text-4xl font-black leading-tight text-zinc-900 sm:text-5xl">
-            Everything, no tiers
+          <p className="text-sm font-semibold uppercase tracking-wide text-accent">
+            What&rsquo;s included
+          </p>
+          <h2 className="mt-3 font-display text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
+            Built for real campaigns
           </h2>
-          <p className="mt-5 text-base leading-8 text-zinc-600">
-            It is self-hosted and open source, so there is nothing to unlock. You
-            run it, you own it.
+          <p className="mt-5 text-base leading-8 text-muted">
+            Phone login, wallet top-ups, collaborate mode, and full delivery
+            logs — without locking features behind tiers.
           </p>
         </div>
 
@@ -391,7 +322,7 @@ export default async function Home() {
           {features.map((feature) => (
             <div
               key={feature}
-              className="border border-zinc-200 bg-zinc-50 p-4 text-sm font-semibold text-zinc-700"
+              className="rounded-xl border border-border bg-surface p-4 text-sm font-medium text-foreground"
             >
               {feature}
             </div>
@@ -400,50 +331,37 @@ export default async function Home() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-5 pb-20 sm:px-6 lg:px-8">
-        <div className="grid gap-8 border border-orange-200 bg-orange-50 p-6 sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="grid gap-8 rounded-2xl border border-border bg-gradient-to-br from-[#0f766e] via-[#0d5f59] to-[#0a3d3a] p-6 text-white sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
-            <h2 className="max-w-3xl text-4xl font-black leading-tight text-zinc-900 sm:text-5xl">
+            <h2 className="max-w-3xl font-display text-4xl font-semibold leading-tight sm:text-5xl">
               Turn your next reel&rsquo;s comments into DMs
             </h2>
-            <p className="mt-4 text-base text-zinc-600">
-              Free and open source. Star it if it saves you a subscription.
+            <p className="mt-4 text-base text-white/80">
+              Sign in with your phone and start a campaign in minutes.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center gap-2 bg-orange-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-orange-600"
-            >
-              Get started
-            </Link>
-            <a
-              href={GITHUB_URL}
-              className="inline-flex items-center justify-center border border-zinc-200 bg-white px-6 py-3 text-sm font-bold text-zinc-900 transition hover:border-zinc-300 hover:bg-zinc-100"
-            >
-              View on GitHub
-            </a>
-          </div>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 text-sm font-semibold text-accent transition hover:bg-white/90"
+          >
+            Get started
+          </Link>
         </div>
       </section>
 
-      <footer className="border-t border-zinc-200 py-8">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 text-sm text-zinc-500 sm:px-6 lg:px-8">
-          <span className="font-semibold text-zinc-600">Ongevia</span>
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 transition hover:text-zinc-900"
-          >
-            <svg
-              viewBox="0 0 16 16"
-              aria-hidden="true"
-              className="h-4 w-4 fill-current"
-            >
-              <path d={githubIconPath} />
-            </svg>
-            {stars !== null && <span>{formatStars(stars)}</span>}
-          </a>
+      <footer className="border-t border-border py-8">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 text-sm text-muted sm:px-6 lg:px-8">
+          <span className="font-display text-base font-semibold text-foreground">
+            Ongevia
+          </span>
+          <div className="flex gap-4">
+            <Link href="/privacy" className="hover:text-foreground">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-foreground">
+              Terms
+            </Link>
+          </div>
         </div>
       </footer>
     </main>

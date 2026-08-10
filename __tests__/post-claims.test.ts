@@ -4,11 +4,21 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     platformSetting: { findUnique: vi.fn() },
     postClaim: { findFirst: vi.fn(), findMany: vi.fn() },
+    instagramAccount: { findFirst: vi.fn() },
   },
 }));
 
 vi.mock("@/lib/db/client", () => ({
   prisma: mockPrisma,
+}));
+
+vi.mock("@/lib/instagram-accounts", () => ({
+  getPlatformSharedAccount: vi.fn(async () => ({
+    id: "ig_shared",
+    workspaceId: "ws_home",
+    isPlatformShared: true,
+    username: "ongevia",
+  })),
 }));
 
 import {

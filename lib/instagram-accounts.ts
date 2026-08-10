@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { hasIgUsernameShareUnlock } from "@/lib/instagram-username";
+import { platformIgUsername } from "@/lib/platform-ig";
 
 export async function canConnectInstagramAccount({
   workspaceId,
@@ -71,16 +72,21 @@ export async function canConnectInstagramAccount({
 }
 
 export async function getPlatformSharedAccount() {
-  const preferred = (process.env.PLATFORM_INSTAGRAM_USERNAME ?? "ongeviadotcom")
-    .trim()
-    .replace(/^@/, "")
-    .toLowerCase();
+  const preferred = platformIgUsername();
 
   const shared = await prisma.instagramAccount.findFirst({
     where: { isPlatformShared: true },
     orderBy: { connectedAt: "desc" },
   });
-  if (shared) return shared;
+  if (shared) {
+    if (shared.username.toLowerCase() !== preferred) {
+      return prisma.instagramAccount.update({
+        where: { id: shared.id },
+        data: { username: preferred },
+      });
+    }
+    return shared;
+  }
 
   return prisma.instagramAccount.findFirst({
     where: { username: { equals: preferred, mode: "insensitive" } },
@@ -88,30 +94,56 @@ export async function getPlatformSharedAccount() {
   });
 }
 
-/** Accounts the workspace can use for campaigns: own + platform shared (if collaborating). */
+/** Accounts the workspace can use for campaigns: own + platform shared page. */
 export async function listInstagramAccountsForWorkspace(workspaceId: string) {
-  const [own, platform, collaborate] = await Promise.all([
+  const [own, platform] = await Promise.all([
     prisma.instagramAccount.findMany({
       where: { workspaceId },
       orderBy: { connectedAt: "desc" },
     }),
     getPlatformSharedAccount(),
-    prisma.platformSetting.findUnique({
-      where: { key: `workspace:${workspaceId}:collaborate` },
-    }),
   ]);
 
-  const collaborating = Boolean(collaborate?.value);
   if (
     !platform ||
     !platform.isPlatformShared ||
-    platform.workspaceId === workspaceId ||
-    !collaborating
+    platform.workspaceId === workspaceId
   ) {
     return own;
   }
 
   return [...own, platform];
+}
+
+/**
+ * Collaborate is on by default for every workspace when the shared page exists.
+ * Still writes the legacy setting so older checks stay consistent.
+ */
+export async function ensureWorkspaceCollaborating(
+  workspaceId: string
+): Promise<{
+  collaborating: boolean;
+  platform: Awaited<ReturnType<typeof getPlatformSharedAccount>>;
+}> {
+  const platform = await getPlatformSharedAccount();
+  if (!platform?.isPlatformShared) {
+    return { collaborating: false, platform: null };
+  }
+
+  if (platform.workspaceId === workspaceId) {
+    return { collaborating: true, platform };
+  }
+
+  await prisma.platformSetting.upsert({
+    where: { key: `workspace:${workspaceId}:collaborate` },
+    create: {
+      key: `workspace:${workspaceId}:collaborate`,
+      value: platform.id,
+    },
+    update: { value: platform.id },
+  });
+
+  return { collaborating: true, platform };
 }
 
 export async function getWorkspaceInstagramAccount(
@@ -125,15 +157,30 @@ export async function getWorkspaceInstagramAccount(
         OR: [{ workspaceId }, { isPlatformShared: true }],
       },
     });
-    if (account) return account;
+    if (account) {
+      if (account.isPlatformShared && account.workspaceId !== workspaceId) {
+        await ensureWorkspaceCollaborating(workspaceId);
+      }
+      return account;
+    }
 
     const platform = await getPlatformSharedAccount();
-    if (platform?.id === instagramAccountId) return platform;
+    if (platform?.id === instagramAccountId) {
+      await ensureWorkspaceCollaborating(workspaceId);
+      return platform;
+    }
     return null;
   }
 
-  return prisma.instagramAccount.findFirst({
+  // Prefer the workspace's own account, else the shared collaborate page.
+  const own = await prisma.instagramAccount.findFirst({
     where: { workspaceId },
     orderBy: { connectedAt: "desc" },
   });
+  if (own) return own;
+
+  const { collaborating, platform } =
+    await ensureWorkspaceCollaborating(workspaceId);
+  if (collaborating && platform) return platform;
+  return null;
 }
