@@ -52,3 +52,12 @@ describe("instagramShortcode", () => {
     expect(instagramShortcode("https://example.com/foo")).toBeNull();
   });
 });
+
+describe("shortcode media ids", () => {
+  it("round-trips shortcode media ids", () => {
+    expect(shortcodeMediaId("AbC")).toBe("shortcode:AbC");
+    expect(parseShortcodeMediaId("shortcode:AbC")).toBe("AbC");
+    expect(isShortcodeMediaId("shortcode:AbC")).toBe(true);
+    expect(isShortcodeMediaId("178414")).toBe(false);
+  });
+});
