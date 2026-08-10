@@ -4,6 +4,7 @@ import { getPlatformSharedAccount } from "@/lib/instagram-accounts";
 import { platformIgHandle } from "@/lib/platform-ig";
 import { decryptToken } from "@/lib/meta/oauth";
 import {
+  findMessagingUserByUsername,
   getAllUserMedia,
   getCollaborativeMedia,
   getConversationMessages,
@@ -497,6 +498,7 @@ export async function checkPendingClaimFromRecentDms(params: {
   error?: string;
   status?: number;
   confirmationSent?: boolean;
+  needsUsername?: boolean;
 }> {
   const claim = await prisma.postClaim.findFirst({
     where: { id: params.claimId, workspaceId: params.workspaceId },
@@ -602,11 +604,134 @@ export async function checkPendingClaimFromRecentDms(params: {
   return {
     ok: true,
     verified: false,
+    needsUsername: true,
     error:
       scanned === 0
-        ? `No DMs found yet. Message @${platform.username} with your code, wait a few seconds, then tap Check again.`
-        : `Code not found in recent DMs yet. Make sure you sent it to @${platform.username}, then tap Check again.`,
+        ? `Instagram isn’t giving Ongevia your DMs yet (Meta returned an empty inbox). Enter your Instagram username below to confirm you sent the code to @${platform.username}.`
+        : `Code not found in recent DMs yet. Enter your Instagram username to confirm you already sent the code to @${platform.username}.`,
   };
+}
+
+/** Fallback when Meta won’t expose DMs: user confirms their IG username. */
+export async function confirmPendingClaimWithUsername(params: {
+  workspaceId: string;
+  claimId: string;
+  claimantIgUsername: string;
+}): Promise<{
+  ok: boolean;
+  verified: boolean;
+  error?: string;
+  status?: number;
+}> {
+  const username = params.claimantIgUsername
+    .trim()
+    .replace(/^@/, "")
+    .toLowerCase();
+  if (!/^[a-z0-9._]{2,30}$/i.test(username)) {
+    return {
+      ok: false,
+      verified: false,
+      error: "Enter a valid Instagram username",
+      status: 400,
+    };
+  }
+
+  const claim = await prisma.postClaim.findFirst({
+    where: { id: params.claimId, workspaceId: params.workspaceId },
+  });
+  if (!claim) {
+    return { ok: false, verified: false, error: "Claim not found", status: 404 };
+  }
+  if (claim.status === "VERIFIED") {
+    return { ok: true, verified: true };
+  }
+  if (claim.status !== "PENDING") {
+    return {
+      ok: false,
+      verified: false,
+      error: "This claim is no longer pending. Get a new code.",
+      status: 400,
+    };
+  }
+  if (claim.expiresAt.getTime() <= Date.now()) {
+    await prisma.postClaim.update({
+      where: { id: claim.id },
+      data: { status: "EXPIRED" },
+    });
+    return {
+      ok: false,
+      verified: false,
+      error: "Code expired. Get a new connect code.",
+      status: 400,
+    };
+  }
+
+  const conflict = await prisma.postClaim.findFirst({
+    where: {
+      instagramAccountId: claim.instagramAccountId,
+      mediaId: claim.mediaId,
+      status: "VERIFIED",
+      NOT: { id: claim.id },
+    },
+  });
+  if (conflict) {
+    return {
+      ok: false,
+      verified: false,
+      error: "Another workspace already claimed this post",
+      status: 409,
+    };
+  }
+
+  const platform = await prisma.instagramAccount.findFirst({
+    where: { id: claim.instagramAccountId },
+  });
+
+  await prisma.postClaim.update({
+    where: { id: claim.id },
+    data: {
+      status: "VERIFIED",
+      verifiedAt: new Date(),
+      claimantIgUsername: username,
+      codeHash: hashOtp(`verified:${claim.id}`),
+    },
+  });
+
+  await logAction({
+    actorUserId: null,
+    action: "instagram.post_claim_verified_username",
+    workspaceId: claim.workspaceId,
+    entityType: "PostClaim",
+    entityId: claim.id,
+    meta: { mediaId: claim.mediaId, username },
+  });
+
+  // Best-effort confirmation DM if we can find an open thread.
+  if (platform?.accessToken) {
+    try {
+      const accessToken = decryptToken(platform.accessToken);
+      const contact = await findMessagingUserByUsername(
+        accessToken,
+        platform.instagramId,
+        username
+      );
+      if (contact?.id) {
+        await sendDirectMessage(
+          accessToken,
+          platform.instagramId,
+          contact.id,
+          `You're connected, @${username}. This post is linked to your Ongevia workspace — go back and continue your campaign.`
+        );
+      }
+    } catch (err) {
+      console.warn(
+        "[post-claims] username-confirm DM failed:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  return { ok: true, verified: true };
 }
 
 /** Status polling helper for the claim UI. */

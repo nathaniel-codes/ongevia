@@ -37,6 +37,8 @@ export default function PostClaimPanel({
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
+  const [needsUsername, setNeedsUsername] = useState(false);
+  const [claimantUsername, setClaimantUsername] = useState("");
 
   const reload = useCallback(async () => {
     const res = await fetch("/api/instagram/claims");
@@ -113,6 +115,8 @@ export default function PostClaimPanel({
         expiresAt: payload.data.expiresAt,
       });
       setWaiting(true);
+      setNeedsUsername(false);
+      setClaimantUsername("");
     }
     setBusy(null);
   }
@@ -125,7 +129,13 @@ export default function PostClaimPanel({
     const res = await fetch("/api/instagram/claims", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "check", claimId: pending.id }),
+      body: JSON.stringify({
+        action: "check",
+        claimId: pending.id,
+        ...(needsUsername && claimantUsername.trim()
+          ? { claimantUsername: claimantUsername.trim() }
+          : {}),
+      }),
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -138,11 +148,13 @@ export default function PostClaimPanel({
         `/api/instagram/claims?id=${encodeURIComponent(pending.id)}`
       );
       const statusPayload = await statusRes.json().catch(() => ({}));
+      setNeedsUsername(false);
       await markVerified(
         statusPayload.data?.mediaId,
         statusPayload.data?.postUrl
       );
     } else {
+      if (payload.data?.needsUsername) setNeedsUsername(true);
       setStatusNote(payload.data?.message ?? "Not verified yet.");
     }
     setBusy(null);
@@ -235,13 +247,34 @@ export default function PostClaimPanel({
             </button>
             <button
               type="button"
-              disabled={busy === "check"}
+              disabled={
+                busy === "check" ||
+                (needsUsername && !claimantUsername.trim())
+              }
               onClick={() => void checkClaim()}
               className="rounded bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
             >
               {busy === "check" ? "Checking…" : "Check"}
             </button>
           </div>
+          {needsUsername ? (
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-foreground">
+                Your Instagram username
+              </label>
+              <input
+                type="text"
+                value={claimantUsername}
+                onChange={(e) => setClaimantUsername(e.target.value)}
+                placeholder="@yourusername"
+                className="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-muted">
+                Meta isn’t exposing this inbox to the API yet. Confirm with the
+                username you DMd from, then tap Check.
+              </p>
+            </div>
+          ) : null}
           <p className="text-xs text-muted">
             {waiting
               ? "After you send the DM, tap Check — or wait, this page also updates automatically."

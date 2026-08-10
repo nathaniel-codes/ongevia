@@ -7,6 +7,7 @@ import {
 } from "@/lib/workspace-access";
 import {
   checkPendingClaimFromRecentDms,
+  confirmPendingClaimWithUsername,
   createPostClaim,
   getPostClaimStatus,
   listClaimsForWorkspace,
@@ -26,6 +27,7 @@ const createSchema = z
 const checkSchema = z.object({
   claimId: z.string().min(1),
   action: z.literal("check"),
+  claimantUsername: z.string().min(2).max(40).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -67,6 +69,29 @@ export async function POST(request: NextRequest) {
 
   const checkParsed = checkSchema.safeParse(body);
   if (checkParsed.success) {
+    if (checkParsed.data.claimantUsername) {
+      const result = await confirmPendingClaimWithUsername({
+        workspaceId: context.workspaceId,
+        claimId: checkParsed.data.claimId,
+        claimantIgUsername: checkParsed.data.claimantUsername,
+      });
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: result.error ?? "Confirm failed" },
+          { status: result.status ?? 400 }
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        data: {
+          verified: result.verified,
+          message: result.verified
+            ? "Connected. You can continue your campaign."
+            : result.error,
+        },
+      });
+    }
+
     const result = await checkPendingClaimFromRecentDms({
       workspaceId: context.workspaceId,
       claimId: checkParsed.data.claimId,
@@ -81,6 +106,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         verified: result.verified,
+        needsUsername: result.needsUsername ?? false,
         message: result.verified
           ? "Connected. Check Instagram for the confirmation DM."
           : result.error,
