@@ -15,24 +15,31 @@ const navItems = [
   { label: "Inbox", href: "/inbox" },
   { label: "Campaigns", href: "/campaigns" },
   { label: "DM Logs", href: "/logs" },
-  { label: "Activity", href: "/activity" },
   { label: "Wallet", href: "/wallet" },
   { label: "Settings", href: "/settings" },
+];
+
+const adminNavItems = [
+  { label: "Activity", href: "/activity" },
   { label: "Diagnostics", href: "/diagnostics" },
+  { label: "Admin", href: "/admin" },
 ];
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   workspaceName: string;
+  isSuperAdmin?: boolean;
 }
 
 export default function Sidebar({
   isOpen,
   onClose,
   workspaceName,
+  isSuperAdmin = false,
 }: SidebarProps) {
   const pathname = usePathname();
+  const items = isSuperAdmin ? [...navItems, ...adminNavItems] : navItems;
 
   return (
     <>
@@ -53,13 +60,16 @@ export default function Sidebar({
         `}
       >
         <div className="px-6 py-5 border-b border-border">
-          <Link href="/dashboard" className="font-display text-xl font-semibold tracking-tight">
+          <Link
+            href="/dashboard"
+            className="font-display text-xl font-semibold tracking-tight"
+          >
             Ongevia
           </Link>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -85,7 +95,6 @@ export default function Sidebar({
 
         <div className="px-5 py-4 border-t border-border">
           <p className="text-sm text-foreground truncate">{workspaceName}</p>
-          <p className="text-xs text-muted">Self-hosted</p>
         </div>
       </aside>
     </>

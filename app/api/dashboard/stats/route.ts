@@ -7,6 +7,7 @@ import {
   normalizeTopKeywords,
   summarizeDmStatuses,
 } from "@/lib/tracking/analytics";
+import { ensureWallet, getDmCreditCost } from "@/lib/wallet";
 
 export async function GET(request: NextRequest) {
   const workspaceId = await getCurrentWorkspaceId();
@@ -136,12 +137,6 @@ export async function GET(request: NextRequest) {
     webhookSubscribed: account.webhookSubscribed,
     isPlatformShared: account.isPlatformShared,
   }));
-  const instagramAccount =
-    (selectedAccountId
-      ? instagramAccounts.find((a) => a.id === selectedAccountId)
-      : null) ??
-    instagramAccounts[0] ??
-    null;
 
   const dailyDMs: { date: string; count: number }[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -184,21 +179,64 @@ export async function GET(request: NextRequest) {
     /^\+?\d[\d\s-]{6,}$/.test(rawName) ||
     (user?.phone != null && rawName === user.phone);
   const displayName =
-    instagramAccounts[0]?.username ||
     (!looksLikePhone ? rawName.split(/\s+/)[0] : null) ||
     user?.email?.split("@")[0] ||
     null;
+
+  const platformAccount =
+    instagramAccounts.find((a) => a.isPlatformShared) ?? null;
+  const defaultAccount = platformAccount ?? instagramAccounts[0] ?? null;
+
+  let walletBalance = 0;
+  let creditsGained = 0;
+  let creditsSpent = 0;
+  let dmCreditCost = 10;
+  if (userId) {
+    const wallet = await ensureWallet(userId);
+    walletBalance = wallet.balance;
+    dmCreditCost = await getDmCreditCost();
+    const [gained, spent] = await Promise.all([
+      prisma.walletTransaction.aggregate({
+        where: {
+          walletId: wallet.id,
+          type: { in: ["TOP_UP", "ADMIN_GRANT", "REFUND"] },
+        },
+        _sum: { amount: true },
+      }),
+      prisma.walletTransaction.aggregate({
+        where: {
+          walletId: wallet.id,
+          type: { in: ["DM_SPEND", "ADMIN_DEBIT"] },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+    creditsGained = gained._sum.amount ?? 0;
+    creditsSpent = Math.abs(spent._sum.amount ?? 0);
+  }
+
+  const collaborate = await prisma.platformSetting.findUnique({
+    where: { key: `workspace:${workspaceId}:collaborate` },
+  });
 
   return NextResponse.json({
     success: true,
     data: {
       userName: displayName,
-      instagramUsername: instagramAccounts[0]?.username ?? null,
+      instagramUsername: defaultAccount?.username ?? null,
       contactsCount: contactRows.length,
       workspace,
-      instagramAccount,
+      instagramAccount: defaultAccount,
       instagramAccounts,
       selectedInstagramAccountId: selectedAccountId,
+      collaborating: Boolean(collaborate?.value),
+      platformUsername: platformAccount?.username ?? null,
+      wallet: {
+        balance: walletBalance,
+        creditsGained,
+        creditsSpent,
+        dmCreditCost,
+      },
       totalAutomations,
       activeAutomations,
       dmsSentToday,

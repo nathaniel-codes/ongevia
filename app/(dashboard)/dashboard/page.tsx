@@ -3,10 +3,11 @@
 /**
  * Dashboard Home Page
  *
- * Overview cards, 7-day chart, and recent activity feed.
+ * Wallet banner, default account, overview cards, and recent activity.
  */
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
 import StatCard from "@/components/stat-card";
 import StatusBadge from "@/components/status-badge";
@@ -26,6 +27,14 @@ interface DashboardStats {
   clicksThisMonth: number;
   totalClicks: number;
   ctrThisMonth: number;
+  collaborating: boolean;
+  platformUsername: string | null;
+  wallet: {
+    balance: number;
+    creditsGained: number;
+    creditsSpent: number;
+    dmCreditCost: number;
+  };
   instagramAccounts: AccountOption[];
   selectedInstagramAccountId: string | null;
   topKeywords: { keyword: string; count: number }[];
@@ -69,12 +78,13 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+        <div className="panel h-28 rounded-xl" />
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="panel rounded p-5 h-32">
-              <div className="w-10 h-10 rounded bg-surface-hover" />
-              <div className="mt-4 h-6 w-16 bg-surface-hover rounded" />
-              <div className="mt-2 h-4 w-24 bg-surface-hover/60 rounded" />
+            <div key={i} className="panel h-32 rounded p-5">
+              <div className="h-10 w-10 rounded bg-surface-hover" />
+              <div className="mt-4 h-6 w-16 rounded bg-surface-hover" />
+              <div className="mt-2 h-4 w-24 rounded bg-surface-hover/60" />
             </div>
           ))}
         </div>
@@ -83,20 +93,102 @@ export default function DashboardPage() {
   }
 
   const maxDM = Math.max(...(stats?.dailyDMs.map((d) => d.count) ?? [1]), 1);
-
   const connectedCount = stats?.instagramAccounts.length ?? 0;
+  const wallet = stats?.wallet;
+  const defaultHandle = stats?.instagramUsername
+    ? `@${stats.instagramUsername}`
+    : null;
+  const repliesLeft =
+    wallet && wallet.dmCreditCost > 0
+      ? Math.floor(wallet.balance / wallet.dmCreditCost)
+      : null;
 
   return (
     <div className="space-y-8">
+      {/* Wallet + default account banner */}
+      <section className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-[#0f766e] via-[#0d5f59] to-[#0a3d3a] p-5 text-white sm:p-7">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-medium text-white/70">Credit balance</p>
+            <p className="mt-1 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+              {(wallet?.balance ?? 0).toLocaleString()}
+              <span className="ml-2 text-base font-sans font-medium text-white/70">
+                TZS
+              </span>
+            </p>
+            <p className="mt-3 text-sm text-white/80">
+              You’ve gained{" "}
+              <span className="font-semibold text-white">
+                {(wallet?.creditsGained ?? 0).toLocaleString()} TZS
+              </span>{" "}
+              in credits (bonuses + top-ups)
+              {wallet && wallet.creditsSpent > 0 ? (
+                <>
+                  {" "}
+                  · spent {(wallet.creditsSpent ?? 0).toLocaleString()} TZS
+                </>
+              ) : null}
+              {repliesLeft != null ? (
+                <>
+                  {" "}
+                  · about {repliesLeft.toLocaleString()} replies left
+                </>
+              ) : null}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link
+                href="/wallet"
+                className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0f766e] hover:bg-white/90"
+              >
+                Top up wallet
+              </Link>
+              <Link
+                href="/wallet"
+                className="rounded-lg border border-white/30 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                View transactions
+              </Link>
+            </div>
+          </div>
+
+          <div className="min-w-[220px] rounded-xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-white/60">
+              Default account
+            </p>
+            {defaultHandle ? (
+              <>
+                <p className="mt-2 text-xl font-semibold">{defaultHandle}</p>
+                <p className="mt-1 text-sm text-white/75">
+                  {stats?.collaborating ||
+                  stats?.instagramAccounts.some((a) => a.isPlatformShared)
+                    ? "Ongevia shared page — collaborate ready"
+                    : "Your connected Instagram"}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-lg font-semibold">Not connected yet</p>
+                <p className="mt-1 text-sm text-white/75">
+                  Enable Collaborate in Settings to use @ongeviadotcom, or connect
+                  your own Instagram.
+                </p>
+                <Link
+                  href="/settings"
+                  className="mt-3 inline-block text-sm font-semibold text-white underline underline-offset-2"
+                >
+                  Open Settings
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* Greeting header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-            Hello,{" "}
-            {stats?.instagramUsername
-              ? `@${stats.instagramUsername}`
-              : stats?.userName ?? "there"}
-            !
+            Hello, {stats?.userName ?? "there"}!
           </h1>
           <p className="mt-1 text-sm text-muted">
             {connectedCount} connected{" "}
@@ -106,7 +198,7 @@ export default function DashboardPage() {
             {stats?.contactsCount === 1 ? "contact" : "contacts"}
             {" · "}
             <a href="/logs" className="text-accent hover:underline">
-              See activity
+              See DM logs
             </a>
           </p>
         </div>
@@ -120,7 +212,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           label="Active Campaigns"
           value={stats?.activeAutomations ?? 0}
@@ -133,19 +225,26 @@ export default function DashboardPage() {
       </div>
 
       {/* Chart + Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 sm:gap-6">
-        {/* 7-Day Chart */}
-        <div className="lg:col-span-3 panel rounded p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-foreground mb-6">DMs — Last 7 Days</h2>
-          <div className="flex items-end gap-1.5 h-40 sm:gap-2">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-6">
+        <div className="panel rounded p-4 sm:p-6 lg:col-span-3">
+          <h2 className="mb-6 text-sm font-semibold text-foreground">
+            DMs — Last 7 Days
+          </h2>
+          <div className="flex h-40 items-end gap-1.5 sm:gap-2">
             {stats?.dailyDMs.map((day) => (
-              <div key={day.date} className="min-w-0 flex-1 flex flex-col items-center gap-2">
-                <span className="text-xs text-muted font-medium">{day.count}</span>
+              <div
+                key={day.date}
+                className="flex min-w-0 flex-1 flex-col items-center gap-2"
+              >
+                <span className="text-xs font-medium text-muted">
+                  {day.count}
+                </span>
                 <div
-                  className="w-full rounded-sm bg-accent min-h-[4px]"
-                  style={{ height: `${Math.max((day.count / maxDM) * 100, 4)}%` }}
+                  className="min-h-[4px] w-full rounded-sm bg-accent"
+                  style={{
+                    height: `${Math.max((day.count / maxDM) * 100, 4)}%`,
+                  }}
                 />
-                {/* Seven labels share a phone's width, so they must not wrap. */}
                 <span className="w-full truncate text-center text-[10px] text-zinc-500">
                   {day.date}
                 </span>
@@ -154,15 +253,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Top Keywords */}
-        <div className="lg:col-span-1 panel rounded p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Top Keywords</h2>
+        <div className="panel rounded p-4 sm:p-6 lg:col-span-1">
+          <h2 className="mb-4 text-sm font-semibold text-foreground">
+            Top Keywords
+          </h2>
           <div className="space-y-3">
             {stats?.topKeywords.length === 0 && (
-              <p className="text-sm text-muted py-8">No keyword matches yet</p>
+              <p className="py-8 text-sm text-muted">No keyword matches yet</p>
             )}
             {stats?.topKeywords.map((keyword) => (
-              <div key={keyword.keyword} className="flex items-center justify-between gap-3">
+              <div
+                key={keyword.keyword}
+                className="flex items-center justify-between gap-3"
+              >
                 <span className="truncate text-sm font-medium text-foreground">
                   {keyword.keyword}
                 </span>
@@ -172,23 +275,24 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Activity */}
-        <div className="lg:col-span-2 panel rounded p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Recent Activity</h2>
-          <div className="space-y-3 max-h-60 overflow-y-auto">
+        <div className="panel rounded p-4 sm:p-6 lg:col-span-2">
+          <h2 className="mb-4 text-sm font-semibold text-foreground">
+            Recent Activity
+          </h2>
+          <div className="max-h-60 space-y-3 overflow-y-auto">
             {stats?.recentLogs.length === 0 && (
-              <p className="text-sm text-muted text-center py-8">No activity yet</p>
+              <p className="py-8 text-center text-sm text-muted">No activity yet</p>
             )}
             {stats?.recentLogs.map((log) => (
               <div
                 key={log.id}
-                className="flex items-center justify-between gap-3 py-2 border-b border-border last:border-0"
+                className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">
+                  <p className="truncate text-sm font-medium text-foreground">
                     @{log.commenterName ?? "unknown"}
                   </p>
-                  <p className="text-xs text-muted truncate">
+                  <p className="truncate text-xs text-muted">
                     {log.instagramAccount
                       ? `@${log.instagramAccount.username} · `
                       : ""}

@@ -3,6 +3,7 @@ import DashboardShell from "@/components/dashboard-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { ensureWorkspaceForUser } from "@/lib/workspace";
+import { listInstagramAccountsForWorkspace } from "@/lib/instagram-accounts";
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,7 @@ export default async function DashboardLayout({
       phone: true,
       email: true,
       isSuspended: true,
+      isSuperAdmin: true,
     },
   });
 
@@ -34,17 +36,16 @@ export default async function DashboardLayout({
     user.id,
     user.phone ?? user.email
   );
-  const accounts = await prisma.instagramAccount.findMany({
-    where: { workspaceId: workspace.id },
-    orderBy: { connectedAt: "desc" },
-    select: { username: true },
-  });
+  const accounts = await listInstagramAccountsForWorkspace(workspace.id);
+  const primary =
+    accounts.find((a) => a.isPlatformShared) ?? accounts[0] ?? null;
 
   return (
     <DashboardShell
       workspaceName={workspace.name}
-      instagramUsername={accounts[0]?.username ?? null}
+      instagramUsername={primary?.username ?? null}
       instagramAccountCount={accounts.length}
+      isSuperAdmin={user.isSuperAdmin}
     >
       {children}
     </DashboardShell>
