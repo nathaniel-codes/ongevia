@@ -104,7 +104,7 @@ export default async function LoginPage({
     const code = await createPhoneOtp(normalized);
     const sms = await sendBeemSms({
       destAddr: normalized,
-      message: `Your Ongevia login code is ${code}. Valid for 10 minutes.`,
+      message: `${code} is your Ongevia login code. Valid for 10 minutes.`,
     });
     if (!sms.ok) {
       await logAction({

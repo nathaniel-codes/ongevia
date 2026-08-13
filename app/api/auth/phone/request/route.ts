@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   const code = await createPhoneOtp(phone);
   const sms = await sendBeemSms({
     destAddr: phone,
-    message: `Your Ongevia login code is ${code}. Valid for 10 minutes.`,
+    message: `${code} is your Ongevia login code. Valid for 10 minutes.`,
   });
 
   if (!sms.ok) {
