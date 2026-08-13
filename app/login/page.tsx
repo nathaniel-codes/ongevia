@@ -212,11 +212,20 @@ export default async function LoginPage({
                 Verify & sign in
               </button>
               <Link
-                href={`/login?phone=${encodeURIComponent(phone)}`}
+                href={`/login?phone=${encodeURIComponent(phone)}&step=otp`}
                 className="block text-center text-sm text-muted hover:text-foreground"
               >
-                Resend or use a different number
+                Use a different number
               </Link>
+              <form action={requestOtp} className="pt-1">
+                <input type="hidden" name="phone" value={phone} />
+                <button
+                  type="submit"
+                  className="block w-full text-center text-sm text-accent hover:underline"
+                >
+                  Resend code
+                </button>
+              </form>
             </form>
           ) : (
             <form action={requestOtp} className="space-y-5">
