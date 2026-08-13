@@ -12,8 +12,10 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
 
+  // Stale JWT after wipe: cookie may still exist while session.user is empty.
+  // Clear cookies instead of bouncing to /login (which used to loop).
   if (!session?.user?.id) {
-    redirect("/login");
+    redirect("/api/auth/invalidate");
   }
 
   const user = await prisma.user.findUnique({

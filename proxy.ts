@@ -28,10 +28,11 @@ export function proxy(request: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
-  const isLogin = pathname === "/login";
   const isAdminLogin = pathname === "/admin/login";
   const isAuthenticated = hasSessionCookie(request);
 
+  // Cookie present ≠ valid session (e.g. after DB wipe). Only the login page
+  // should redirect based on auth(); bouncing here causes a blank-page loop.
   if (isProtected && !isAuthenticated && !isAdminLogin) {
     const loginUrl = new URL(
       pathname.startsWith("/admin") ? "/admin/login" : "/login",
@@ -39,10 +40,6 @@ export function proxy(request: NextRequest) {
     );
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
-  }
-
-  if (isLogin && isAuthenticated) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();

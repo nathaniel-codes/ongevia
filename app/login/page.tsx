@@ -50,7 +50,7 @@ export default async function LoginPage({
     : null;
   const callbackUrl = params.callbackUrl ?? templateCallbackUrl ?? "/dashboard";
 
-  if (session?.user) {
+  if (session?.user?.id) {
     redirect(callbackUrl);
   }
 
