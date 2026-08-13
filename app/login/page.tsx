@@ -10,6 +10,7 @@ import {
 import { sendBeemSms } from "@/lib/services/beem-sms";
 import { prisma } from "@/lib/db/client";
 import { logAction } from "@/lib/action-log";
+import LoginOtpForm from "@/components/login-otp-form";
 
 export const metadata = {
   title: "Login - Ongevia",
@@ -21,12 +22,18 @@ function loginRedirect(params: {
   error?: string;
   phone?: string;
   step?: string;
+  notice?: string;
   callbackUrl?: string;
 }) {
   const q = new URLSearchParams();
   if (params.error) q.set("error", params.error);
   if (params.phone) q.set("phone", params.phone);
   if (params.step) q.set("step", params.step);
+  if (params.notice) {
+    q.set("notice", params.notice);
+    // Bust client cache so the success banner animates on every resend.
+    q.set("t", String(Date.now()));
+  }
   if (params.callbackUrl) q.set("callbackUrl", params.callbackUrl);
   redirect(`/login?${q.toString()}`);
 }
@@ -40,6 +47,8 @@ export default async function LoginPage({
     error?: string;
     phone?: string;
     step?: string;
+    notice?: string;
+    t?: string;
   }>;
 }) {
   const session = await auth();
@@ -83,8 +92,6 @@ export default async function LoginPage({
 
     const gate = await getPhoneOtpSendGate(normalized);
     if (!gate.ok) {
-      // A code was already sent recently — take them to OTP entry instead of
-      // bouncing back to the phone step with only an error.
       loginRedirect({
         step: "otp",
         phone: phoneValue,
@@ -106,8 +113,10 @@ export default async function LoginPage({
         meta: { phone: normalized, error: sms.error },
       });
       loginRedirect({
-        error: "Could not send SMS. Try again shortly.",
+        step: "otp",
         phone: phoneValue,
+        error: "Could not send SMS. Try again shortly.",
+        callbackUrl,
       });
       return;
     }
@@ -121,6 +130,7 @@ export default async function LoginPage({
     loginRedirect({
       step: "otp",
       phone: phoneValue,
+      notice: "sent",
       callbackUrl,
     });
   }
@@ -174,82 +184,47 @@ export default async function LoginPage({
         </div>
 
         <div className="panel rounded-xl p-8 shadow-sm">
-          {params.error && (
-            <p className="mb-4 text-sm text-error">
-              {params.error === "session"
-                ? "Your session expired after a system reset. Sign in again."
-                : params.error}
-            </p>
-          )}
-
           {step === "otp" ? (
-            <form action={verifyOtp} className="space-y-5">
-              <input type="hidden" name="phone" value={phone} />
-              <p className="text-sm text-muted">
-                Enter the 6-digit code sent to{" "}
-                <span className="font-medium text-foreground">{phone}</span>
-              </p>
-              <div className="space-y-2">
-                <label htmlFor="code" className="block text-sm font-medium">
-                  Login code
-                </label>
-                <input
-                  id="code"
-                  name="code"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  required
-                  maxLength={8}
-                  autoComplete="one-time-code"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm tracking-widest"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover"
-              >
-                Verify & sign in
-              </button>
-              <Link
-                href={`/login?phone=${encodeURIComponent(phone)}&step=otp`}
-                className="block text-center text-sm text-muted hover:text-foreground"
-              >
-                Use a different number
-              </Link>
-              <form action={requestOtp} className="pt-1">
-                <input type="hidden" name="phone" value={phone} />
+            <LoginOtpForm
+              phone={phone}
+              notice={params.notice}
+              noticeKey={params.t}
+              error={params.error}
+              verifyAction={verifyOtp}
+              resendAction={requestOtp}
+            />
+          ) : (
+            <>
+              {params.error && (
+                <p className="mb-4 text-sm text-error">
+                  {params.error === "session"
+                    ? "Your session expired after a system reset. Sign in again."
+                    : params.error}
+                </p>
+              )}
+              <form action={requestOtp} className="space-y-5">
+                <div className="space-y-2">
+                  <label htmlFor="phone" className="block text-sm font-medium">
+                    Phone number
+                  </label>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    required
+                    defaultValue={phone}
+                    placeholder="07XXXXXXXX"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+                  />
+                </div>
                 <button
                   type="submit"
-                  className="block w-full text-center text-sm text-accent hover:underline"
+                  className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover"
                 >
-                  Resend code
+                  Send login code
                 </button>
               </form>
-            </form>
-          ) : (
-            <form action={requestOtp} className="space-y-5">
-              <div className="space-y-2">
-                <label htmlFor="phone" className="block text-sm font-medium">
-                  Phone number
-                </label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  required
-                  defaultValue={phone}
-                  placeholder="07XXXXXXXX"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover"
-              >
-                Send login code
-              </button>
-            </form>
+            </>
           )}
         </div>
       </div>
