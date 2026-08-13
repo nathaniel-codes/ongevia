@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db/client";
 import { hasIgUsernameShareUnlock } from "@/lib/instagram-username";
-import { platformIgUsername } from "@/lib/platform-ig";
 
 export async function canConnectInstagramAccount({
   workspaceId,
@@ -71,74 +70,32 @@ export async function canConnectInstagramAccount({
   };
 }
 
-export async function getPlatformSharedAccount() {
-  const preferred = platformIgUsername();
-
-  const shared = await prisma.instagramAccount.findFirst({
-    where: { isPlatformShared: true },
-    orderBy: { connectedAt: "desc" },
-  });
-  if (shared) {
-    // Keep the Instagram username Meta reports — do not overwrite with env alias.
-    return shared;
-  }
-
-  return prisma.instagramAccount.findFirst({
-    where: { username: { equals: preferred, mode: "insensitive" } },
-    orderBy: { connectedAt: "desc" },
-  });
+/** @deprecated Shared collaborate page removed — always null. */
+export async function getPlatformSharedAccount(): Promise<{
+  id: string;
+  workspaceId: string;
+  instagramId: string;
+  username: string;
+  accessToken: string;
+  isPlatformShared: boolean;
+} | null> {
+  return null;
 }
 
-/** Accounts the workspace can use for campaigns: own + platform shared page. */
-export async function listInstagramAccountsForWorkspace(workspaceId: string) {
-  const [own, platform] = await Promise.all([
-    prisma.instagramAccount.findMany({
-      where: { workspaceId },
-      orderBy: { connectedAt: "desc" },
-    }),
-    getPlatformSharedAccount(),
-  ]);
-
-  if (
-    !platform ||
-    !platform.isPlatformShared ||
-    platform.workspaceId === workspaceId
-  ) {
-    return own;
-  }
-
-  return [...own, platform];
-}
-
-/**
- * Collaborate is on by default for every workspace when the shared page exists.
- * Still writes the legacy setting so older checks stay consistent.
- */
-export async function ensureWorkspaceCollaborating(
-  workspaceId: string
-): Promise<{
+/** @deprecated Shared collaborate mode removed. */
+export async function ensureWorkspaceCollaborating(_workspaceId: string): Promise<{
   collaborating: boolean;
   platform: Awaited<ReturnType<typeof getPlatformSharedAccount>>;
 }> {
-  const platform = await getPlatformSharedAccount();
-  if (!platform?.isPlatformShared) {
-    return { collaborating: false, platform: null };
-  }
+  return { collaborating: false, platform: null };
+}
 
-  if (platform.workspaceId === workspaceId) {
-    return { collaborating: true, platform };
-  }
-
-  await prisma.platformSetting.upsert({
-    where: { key: `workspace:${workspaceId}:collaborate` },
-    create: {
-      key: `workspace:${workspaceId}:collaborate`,
-      value: platform.id,
-    },
-    update: { value: platform.id },
+/** Instagram accounts owned by this workspace (own connect only). */
+export async function listInstagramAccountsForWorkspace(workspaceId: string) {
+  return prisma.instagramAccount.findMany({
+    where: { workspaceId, isPlatformShared: false },
+    orderBy: { connectedAt: "desc" },
   });
-
-  return { collaborating: true, platform };
 }
 
 export async function getWorkspaceInstagramAccount(
@@ -146,36 +103,17 @@ export async function getWorkspaceInstagramAccount(
   instagramAccountId?: string | null
 ) {
   if (instagramAccountId && instagramAccountId !== "all") {
-    const account = await prisma.instagramAccount.findFirst({
+    return prisma.instagramAccount.findFirst({
       where: {
         id: instagramAccountId,
-        OR: [{ workspaceId }, { isPlatformShared: true }],
+        workspaceId,
+        isPlatformShared: false,
       },
     });
-    if (account) {
-      if (account.isPlatformShared && account.workspaceId !== workspaceId) {
-        await ensureWorkspaceCollaborating(workspaceId);
-      }
-      return account;
-    }
-
-    const platform = await getPlatformSharedAccount();
-    if (platform?.id === instagramAccountId) {
-      await ensureWorkspaceCollaborating(workspaceId);
-      return platform;
-    }
-    return null;
   }
 
-  // Prefer the workspace's own account, else the shared collaborate page.
-  const own = await prisma.instagramAccount.findFirst({
-    where: { workspaceId },
+  return prisma.instagramAccount.findFirst({
+    where: { workspaceId, isPlatformShared: false },
     orderBy: { connectedAt: "desc" },
   });
-  if (own) return own;
-
-  const { collaborating, platform } =
-    await ensureWorkspaceCollaborating(workspaceId);
-  if (collaborating && platform) return platform;
-  return null;
 }

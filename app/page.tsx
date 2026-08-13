@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 const flowSteps = [
   {
     eyebrow: "Connect",
-    title: "Link Instagram or collaborate",
+    title: "Connect your Instagram",
     description:
-      "Sign in with your phone. Connect your own Instagram, or collaborate with @ongeviadotcom without OAuth.",
+      "Sign in with your phone, then link a professional Instagram account you admin.",
   },
   {
     eyebrow: "Build",
@@ -32,7 +32,6 @@ const flowSteps = [
 
 const features = [
   "Phone OTP sign-in",
-  "Collaborate with @ongeviadotcom",
   "Connect your own Instagram",
   "Encrypted tokens at rest",
   "Webhook + polling reconciliation",
@@ -87,7 +86,7 @@ function OverviewPreview() {
         <div>
           <h3 className="text-base font-semibold text-foreground">Overview</h3>
           <p className="mt-1 text-xs text-muted">
-            Recent — 24 posts from @ongeviadotcom
+            Recent — 24 posts from @yourbrand
           </p>
         </div>
         <span className="rounded border border-border px-2 py-1 text-xs text-muted">
@@ -164,7 +163,7 @@ function DashboardPreview() {
         <p className="text-xs text-white/70">Credit balance</p>
         <p className="mt-1 font-display text-3xl font-semibold">1,000 TZS</p>
         <p className="mt-2 text-xs text-white/80">
-          Default account · @ongeviadotcom
+          Connected · @yourbrand
         </p>
       </div>
 
@@ -172,7 +171,7 @@ function DashboardPreview() {
         Hello, there!
       </h3>
       <p className="mt-1 text-xs text-muted">
-        1 connected account · collaborate ready
+        1 connected account · ready for campaigns
       </p>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
@@ -217,8 +216,8 @@ export default function Home() {
 
           <p className="mt-5 max-w-xl text-base leading-7 text-muted">
             Someone comments your keyword — they get your private reply through
-            the official Meta API. Phone login, wallet credits, collaborate with
-            @ongeviadotcom.
+            the official Meta API. Phone login, wallet credits, your own
+            Instagram account.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -255,7 +254,7 @@ export default function Home() {
               A comment in, a DM out
             </h2>
             <p className="mt-5 text-base leading-8 text-muted">
-              Three steps. Connect or collaborate, build a campaign, and let it
+              Three steps. Connect Instagram, build a campaign, and let it
               run. The webhook handles it live and the poll sweeps up whatever
               the webhook misses.
             </p>
@@ -313,7 +312,7 @@ export default function Home() {
             Built for real campaigns
           </h2>
           <p className="mt-5 text-base leading-8 text-muted">
-            Phone login, wallet top-ups, collaborate mode, and full delivery
+            Phone login, wallet top-ups, Instagram connect, and full delivery
             logs — without locking features behind tiers.
           </p>
         </div>

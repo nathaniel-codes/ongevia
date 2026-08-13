@@ -11,7 +11,6 @@ import Link from "next/link";
 import AccountSelect, { type AccountOption } from "@/components/account-select";
 import StatCard from "@/components/stat-card";
 import StatusBadge from "@/components/status-badge";
-import { platformIgHandle } from "@/lib/platform-ig";
 
 interface DashboardStats {
   userName: string | null;
@@ -28,8 +27,6 @@ interface DashboardStats {
   clicksThisMonth: number;
   totalClicks: number;
   ctrThisMonth: number;
-  collaborating: boolean;
-  platformUsername: string | null;
   wallet: {
     balance: number;
     creditsGained: number;
@@ -154,15 +151,13 @@ export default function DashboardPage() {
 
           <div className="min-w-[240px] rounded-xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
             <p className="text-xs font-medium uppercase tracking-wide text-white/60">
-              Default account
+              Instagram account
             </p>
             {defaultHandle ? (
               <>
                 <p className="mt-2 text-xl font-semibold">{defaultHandle}</p>
                 <p className="mt-1 text-sm text-white/75">
-                  {stats?.instagramAccounts.some((a) => a.isPlatformShared)
-                    ? `Ready to use — invite ${platformIgHandle()} on your Reel, claim it in Settings, then run campaigns. Overview shows this page’s analytics; DMs and clicks stay on this Dashboard.`
-                    : "Your Instagram — Overview shows this page’s analytics."}
+                  Your Instagram — Overview shows this page’s analytics.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link
@@ -171,38 +166,28 @@ export default function DashboardPage() {
                   >
                     Open Overview
                   </Link>
-                  {stats?.instagramAccounts.some((a) => a.isPlatformShared) ? (
-                    <Link
-                      href="/settings"
-                      className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
-                    >
-                      Claim a post
-                    </Link>
-                  ) : null}
+                  <a
+                    href="/api/instagram/connect"
+                    className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
+                  >
+                    Connect another
+                  </a>
                 </div>
               </>
             ) : (
               <>
-                <p className="mt-2 text-lg font-semibold">
-                  You can use {platformIgHandle()}
-                </p>
+                <p className="mt-2 text-lg font-semibold">Connect Instagram</p>
                 <p className="mt-1 text-sm text-white/75">
-                  No need to connect your Instagram. Invite {platformIgHandle()} on
-                  your Reel, claim the post in Settings, then build a campaign.
+                  Connect a professional Instagram account to run comment-to-DM
+                  campaigns.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href="/settings"
+                  <a
+                    href="/api/instagram/connect"
                     className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#0f766e] hover:bg-white/90"
                   >
-                    Claim a post
-                  </Link>
-                  <Link
-                    href="/overview"
-                    className="rounded-lg bg-white/15 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/25"
-                  >
-                    Open Overview
-                  </Link>
+                    Connect Instagram
+                  </a>
                 </div>
               </>
             )}

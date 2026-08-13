@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentWorkspaceId } from "@/lib/auth";
-import {
-  ensureWorkspaceCollaborating,
-  listInstagramAccountsForWorkspace,
-} from "@/lib/instagram-accounts";
+import { listInstagramAccountsForWorkspace } from "@/lib/instagram-accounts";
 
 export const runtime = "nodejs";
 
@@ -16,8 +13,6 @@ export async function GET() {
     );
   }
 
-  const { collaborating, platform } =
-    await ensureWorkspaceCollaborating(workspaceId);
   const accounts = await listInstagramAccountsForWorkspace(workspaceId);
 
   return NextResponse.json({
@@ -28,13 +23,10 @@ export async function GET() {
         username: a.username,
         instagramId: a.instagramId,
         name: a.name,
-        isPlatformShared: a.isPlatformShared,
-        ownedByWorkspace: a.workspaceId === workspaceId,
+        isPlatformShared: false,
+        ownedByWorkspace: true,
       })),
       selectedInstagramAccountId: accounts[0]?.id ?? null,
-      collaborating,
-      collaborateAccountId: platform?.id ?? null,
-      platformUsername: platform?.username ?? null,
     },
   });
 }

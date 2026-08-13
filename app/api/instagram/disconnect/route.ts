@@ -25,26 +25,9 @@ export async function POST(request: NextRequest) {
   const instagramAccountId =
     typeof body.instagramAccountId === "string" ? body.instagramAccountId : null;
 
-  if (instagramAccountId) {
-    const account = await prisma.instagramAccount.findFirst({
-      where: { id: instagramAccountId, workspaceId: context.workspaceId },
-      select: { isPlatformShared: true },
-    });
-    if (account?.isPlatformShared) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "The Ongevia shared page cannot be disconnected from Settings",
-        },
-        { status: 400 }
-      );
-    }
-  }
-
   await prisma.instagramAccount.deleteMany({
     where: {
       workspaceId: context.workspaceId,
-      isPlatformShared: false,
       ...(instagramAccountId ? { id: instagramAccountId } : {}),
     },
   });

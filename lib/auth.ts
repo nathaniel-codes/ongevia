@@ -7,7 +7,6 @@ import { ensureWorkspaceForUser, getPrimaryWorkspace } from "@/lib/workspace";
 import { ensureWallet } from "@/lib/wallet";
 import { normalizePhone, verifyPhoneOtp, consumePhoneOtp } from "@/lib/phone";
 import { logAction } from "@/lib/action-log";
-import { ensureWorkspaceCollaborating } from "@/lib/instagram-accounts";
 
 type AdapterPrismaClient = Parameters<typeof PrismaAdapter>[0];
 
@@ -44,9 +43,8 @@ export const authConfig = {
                 name: displayName || null,
               },
             });
-            const workspace = await ensureWorkspaceForUser(user.id, phone);
+            await ensureWorkspaceForUser(user.id, phone);
             await ensureWallet(user.id, { grantSignupBonus: true });
-            await ensureWorkspaceCollaborating(workspace.id);
             await logAction({
               actorUserId: user.id,
               action: "auth.signup",
@@ -79,9 +77,8 @@ export const authConfig = {
                 data: { phoneVerified: new Date() },
               });
             }
-            const workspace = await ensureWorkspaceForUser(user.id, phone);
+            await ensureWorkspaceForUser(user.id, phone);
             await ensureWallet(user.id, { grantSignupBonus: true });
-            await ensureWorkspaceCollaborating(workspace.id);
             await logAction({
               actorUserId: user.id,
               action: "auth.login",

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId, getCurrentWorkspaceId } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
-import { listInstagramAccountsForWorkspace, ensureWorkspaceCollaborating } from "@/lib/instagram-accounts";
+import { listInstagramAccountsForWorkspace } from "@/lib/instagram-accounts";
 import {
   calculateCtr,
   normalizeTopKeywords,
@@ -59,9 +59,7 @@ export async function GET(request: NextRequest) {
         dmsSentThisPeriod: true,
       },
     }),
-    ensureWorkspaceCollaborating(workspaceId).then(() =>
-      listInstagramAccountsForWorkspace(workspaceId)
-    ),
+    listInstagramAccountsForWorkspace(workspaceId),
     prisma.automation.count({ where: { workspaceId, ...accountFilter } }),
     prisma.automation.count({
       where: { workspaceId, isActive: true, ...accountFilter },
@@ -185,9 +183,7 @@ export async function GET(request: NextRequest) {
     user?.email?.split("@")[0] ||
     null;
 
-  const platformAccount =
-    instagramAccounts.find((a) => a.isPlatformShared) ?? null;
-  const defaultAccount = platformAccount ?? instagramAccounts[0] ?? null;
+  const defaultAccount = instagramAccounts[0] ?? null;
 
   let walletBalance = 0;
   let creditsGained = 0;
@@ -227,8 +223,6 @@ export async function GET(request: NextRequest) {
       instagramAccount: defaultAccount,
       instagramAccounts,
       selectedInstagramAccountId: selectedAccountId,
-      collaborating: Boolean(platformAccount),
-      platformUsername: platformAccount?.username ?? null,
       wallet: {
         balance: walletBalance,
         creditsGained,

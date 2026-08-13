@@ -1,10 +1,9 @@
 /**
- * Idempotent bootstrap: seed admin, wallet defaults, and platform IG from env.
+ * Idempotent bootstrap: seed admin and wallet defaults.
+ * Shared platform Instagram seeding is retired — users connect their own accounts.
  *
  * Env (on VPS in /etc/ongevia/.env):
  *   ADMIN_EMAIL, ADMIN_PASSWORD
- *   PLATFORM_IG_ACCESS_TOKEN, PLATFORM_IG_USER_ID
- *   PLATFORM_IG_USERNAME (default ongeviadotcom)
  *   CREDITS_PER_1000_TZS, DM_CREDIT_COST, SIGNUP_BONUS_CREDITS
  *
  * Wipe all app data first:
@@ -13,7 +12,6 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/db/client";
-import { encryptToken } from "../lib/meta/oauth";
 import { ensureWorkspaceForUser } from "../lib/workspace";
 
 async function wipeAllData() {
@@ -84,55 +82,16 @@ async function seedWalletDefaults() {
   );
 }
 
-async function seedPlatformInstagram(workspaceId: string) {
-  const token = (process.env.PLATFORM_IG_ACCESS_TOKEN ?? "").trim();
-  const igUserId = (process.env.PLATFORM_IG_USER_ID ?? "").trim();
-  const username = (
-    process.env.PLATFORM_IG_USERNAME ??
-    process.env.PLATFORM_INSTAGRAM_USERNAME ??
-    "ongeviadotcom"
-  )
-    .trim()
-    .replace(/^@/, "")
-    .toLowerCase();
-
-  if (!token || !igUserId) {
-    console.warn(
-      "[bootstrap] PLATFORM_IG_ACCESS_TOKEN / PLATFORM_IG_USER_ID missing — skip IG seed"
-    );
-    return;
-  }
-
-  // Only one platform-shared account
-  await prisma.instagramAccount.updateMany({
+async function clearSharedInstagramFlags() {
+  const result = await prisma.instagramAccount.updateMany({
+    where: { isPlatformShared: true },
     data: { isPlatformShared: false },
   });
-
-  const encrypted = encryptToken(token);
-  const account = await prisma.instagramAccount.upsert({
-    where: { instagramId: igUserId },
-    create: {
-      workspaceId,
-      instagramId: igUserId,
-      username,
-      name: username,
-      accessToken: encrypted,
-      webhookSubscribed: true,
-      isPlatformShared: true,
-    },
-    update: {
-      workspaceId,
-      username,
-      name: username,
-      accessToken: encrypted,
-      webhookSubscribed: true,
-      isPlatformShared: true,
-    },
-  });
-
-  console.log(
-    `[bootstrap] platform IG @${account.username} (${account.instagramId}) shared=true`
-  );
+  if (result.count > 0) {
+    console.log(
+      `[bootstrap] cleared isPlatformShared on ${result.count} Instagram account(s)`
+    );
+  }
 }
 
 async function main() {
@@ -140,15 +99,15 @@ async function main() {
     await wipeAllData();
   }
 
-  const { workspace } = await seedAdmin();
+  await seedAdmin();
   await seedWalletDefaults();
-  await seedPlatformInstagram(workspace.id);
+  await clearSharedInstagramFlags();
   console.log("[bootstrap] done");
 }
 
 main()
   .catch((err) => {
-    console.error(err);
+    console.error("[bootstrap] failed", err);
     process.exit(1);
   })
   .finally(async () => {

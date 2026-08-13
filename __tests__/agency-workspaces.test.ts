@@ -6,6 +6,7 @@ const { mockPrisma } = vi.hoisted(() => ({
       count: vi.fn(),
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     platformSetting: {
       findUnique: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("@/lib/db/client", () => ({
 import {
   canConnectInstagramAccount,
   getWorkspaceInstagramAccount,
+  listInstagramAccountsForWorkspace,
 } from "../lib/instagram-accounts";
 import {
   buildInvitationUrl,
@@ -84,36 +86,37 @@ describe("agency workspace helpers", () => {
     expect(mockPrisma.instagramAccount.findFirst).toHaveBeenCalledWith({
       where: {
         id: "account_1",
-        OR: [{ workspaceId: "workspace_123" }, { isPlatformShared: true }],
+        workspaceId: "workspace_123",
+        isPlatformShared: false,
       },
     });
 
     await getWorkspaceInstagramAccount("workspace_123", "all");
     expect(mockPrisma.instagramAccount.findFirst).toHaveBeenLastCalledWith({
-      where: { workspaceId: "workspace_123" },
+      where: { workspaceId: "workspace_123", isPlatformShared: false },
       orderBy: { connectedAt: "desc" },
     });
   });
 
-  it("falls back to the platform shared account when the workspace has none", async () => {
-    const platform = {
-      id: "platform_1",
-      workspaceId: "platform_ws",
-      isPlatformShared: true,
-      username: "ongeviadotcom",
-    };
-    mockPrisma.instagramAccount.findFirst
-      .mockResolvedValueOnce(null) // own account
-      .mockResolvedValueOnce(platform); // getPlatformSharedAccount
-    mockPrisma.platformSetting.upsert.mockResolvedValue({
-      key: "workspace:workspace_123:collaborate",
-      value: platform.id,
+  it("lists only non-shared accounts for the workspace", async () => {
+    mockPrisma.instagramAccount.findMany.mockResolvedValue([
+      { id: "account_1", isPlatformShared: false },
+    ]);
+
+    await listInstagramAccountsForWorkspace("workspace_123");
+    expect(mockPrisma.instagramAccount.findMany).toHaveBeenCalledWith({
+      where: { workspaceId: "workspace_123", isPlatformShared: false },
+      orderBy: { connectedAt: "desc" },
     });
+  });
+
+  it("does not fall back to a platform shared account", async () => {
+    mockPrisma.instagramAccount.findFirst.mockResolvedValue(null);
 
     await expect(
       getWorkspaceInstagramAccount("workspace_123", "all")
-    ).resolves.toMatchObject({ id: "platform_1", isPlatformShared: true });
-    expect(mockPrisma.platformSetting.upsert).toHaveBeenCalled();
+    ).resolves.toBeNull();
+    expect(mockPrisma.platformSetting.upsert).not.toHaveBeenCalled();
   });
 
   it("normalizes invitation phones and builds invite URLs", () => {
@@ -123,4 +126,3 @@ describe("agency workspace helpers", () => {
     );
   });
 });
-

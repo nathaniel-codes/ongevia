@@ -37,7 +37,6 @@ export default function AccountSelect({
         {accounts.map((account) => (
           <option key={account.id} value={account.id}>
             @{account.username}
-            {account.isPlatformShared ? " (Ongevia shared)" : ""}
           </option>
         ))}
       </select>

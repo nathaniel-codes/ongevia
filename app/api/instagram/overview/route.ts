@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error:
-          "No Instagram account available yet. You can use @ongeviadotcom from Overview once the shared page is connected, or connect your own Instagram.",
+          "No Instagram account connected yet. Connect your Instagram professional account to continue.",
         code: "no_account",
       },
       { status: 400 }
