@@ -67,9 +67,9 @@ const MAX_OTP_ATTEMPTS = 5;
 /** Cooldown between SMS sends to the same phone. */
 export const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 /** Max OTP SMS per phone per rolling hour. */
-export const OTP_MAX_PER_HOUR = 3;
+export const OTP_MAX_PER_HOUR = 8;
 /** Max OTP SMS per phone per rolling day. */
-export const OTP_MAX_PER_DAY = 5;
+export const OTP_MAX_PER_DAY = 15;
 
 export async function getPhoneOtpSendGate(phone: string): Promise<
   | { ok: true }

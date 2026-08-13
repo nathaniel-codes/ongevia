@@ -11,6 +11,7 @@ import { sendBeemSms } from "@/lib/services/beem-sms";
 import { prisma } from "@/lib/db/client";
 import { logAction } from "@/lib/action-log";
 import LoginOtpForm from "@/components/login-otp-form";
+import LoginPhoneForm from "@/components/login-phone-form";
 
 export const metadata = {
   title: "Login - Ongevia",
@@ -18,7 +19,7 @@ export const metadata = {
     "Sign in with your phone to manage Instagram comment-to-DM campaigns.",
 };
 
-function loginRedirect(params: {
+function buildLoginUrl(params: {
   error?: string;
   phone?: string;
   step?: string;
@@ -31,11 +32,10 @@ function loginRedirect(params: {
   if (params.step) q.set("step", params.step);
   if (params.notice) {
     q.set("notice", params.notice);
-    // Bust client cache so the success banner animates on every resend.
     q.set("t", String(Date.now()));
   }
   if (params.callbackUrl) q.set("callbackUrl", params.callbackUrl);
-  redirect(`/login?${q.toString()}`);
+  return `/login?${q.toString()}`;
 }
 
 export default async function LoginPage({
@@ -66,16 +66,17 @@ export default async function LoginPage({
   const step = params.step === "otp" ? "otp" : "phone";
   const phone = params.phone ?? "";
 
-  async function requestOtp(formData: FormData) {
+  async function requestOtp(formData: FormData): Promise<{ url: string }> {
     "use server";
     const phoneValue = String(formData.get("phone") ?? "");
     const normalized = normalizePhone(phoneValue);
     if (!normalized) {
-      loginRedirect({
-        error: "Enter a valid Tanzania phone number (e.g. 07XXXXXXXX).",
-        phone: phoneValue,
-      });
-      return;
+      return {
+        url: buildLoginUrl({
+          error: "Enter a valid Tanzania phone number (e.g. 07XXXXXXXX).",
+          phone: phoneValue,
+        }),
+      };
     }
 
     const existing = await prisma.user.findUnique({
@@ -83,22 +84,24 @@ export default async function LoginPage({
       select: { isSuspended: true },
     });
     if (existing?.isSuspended) {
-      loginRedirect({
-        error: "This account is suspended.",
-        phone: phoneValue,
-      });
-      return;
+      return {
+        url: buildLoginUrl({
+          error: "This account is suspended.",
+          phone: phoneValue,
+        }),
+      };
     }
 
     const gate = await getPhoneOtpSendGate(normalized);
     if (!gate.ok) {
-      loginRedirect({
-        step: "otp",
-        phone: phoneValue,
-        error: gate.error,
-        callbackUrl,
-      });
-      return;
+      return {
+        url: buildLoginUrl({
+          step: "otp",
+          phone: phoneValue,
+          error: gate.error,
+          callbackUrl,
+        }),
+      };
     }
 
     const code = await createPhoneOtp(normalized);
@@ -112,13 +115,14 @@ export default async function LoginPage({
         action: "auth.otp_sms_failed",
         meta: { phone: normalized, error: sms.error },
       });
-      loginRedirect({
-        step: "otp",
-        phone: phoneValue,
-        error: "Could not send SMS. Try again shortly.",
-        callbackUrl,
-      });
-      return;
+      return {
+        url: buildLoginUrl({
+          step: "otp",
+          phone: phoneValue,
+          error: "Could not send SMS. Try again shortly.",
+          callbackUrl,
+        }),
+      };
     }
 
     await logAction({
@@ -127,12 +131,14 @@ export default async function LoginPage({
       meta: { phone: normalized },
     });
 
-    loginRedirect({
-      step: "otp",
-      phone: phoneValue,
-      notice: "sent",
-      callbackUrl,
-    });
+    return {
+      url: buildLoginUrl({
+        step: "otp",
+        phone: phoneValue,
+        notice: "sent",
+        callbackUrl,
+      }),
+    };
   }
 
   async function verifyOtp(formData: FormData) {
@@ -156,13 +162,15 @@ export default async function LoginPage({
       ) {
         throw err;
       }
-      loginRedirect({
-        step: "otp",
-        phone: phoneValue,
-        error:
-          "Could not sign in. Check the code, or request a new one and try again.",
-        callbackUrl,
-      });
+      redirect(
+        buildLoginUrl({
+          step: "otp",
+          phone: phoneValue,
+          error:
+            "Could not sign in. Check the code, or request a new one and try again.",
+          callbackUrl,
+        })
+      );
     }
   }
 
@@ -194,37 +202,11 @@ export default async function LoginPage({
               resendAction={requestOtp}
             />
           ) : (
-            <>
-              {params.error && (
-                <p className="mb-4 text-sm text-error">
-                  {params.error === "session"
-                    ? "Your session expired after a system reset. Sign in again."
-                    : params.error}
-                </p>
-              )}
-              <form action={requestOtp} className="space-y-5">
-                <div className="space-y-2">
-                  <label htmlFor="phone" className="block text-sm font-medium">
-                    Phone number
-                  </label>
-                  <input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    required
-                    defaultValue={phone}
-                    placeholder="07XXXXXXXX"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:bg-accent-hover"
-                >
-                  Send login code
-                </button>
-              </form>
-            </>
+            <LoginPhoneForm
+              phone={phone}
+              error={params.error}
+              requestAction={requestOtp}
+            />
           )}
         </div>
       </div>
