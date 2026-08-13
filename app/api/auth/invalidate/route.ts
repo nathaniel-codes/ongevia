@@ -20,7 +20,7 @@ const COOKIE_NAMES = [
 function clearCookie(
   response: NextResponse,
   name: string,
-  opts: { secure: boolean; hostOnly?: boolean }
+  opts: { secure: boolean }
 ) {
   response.cookies.set(name, "", {
     httpOnly: true,
@@ -29,7 +29,6 @@ function clearCookie(
     expires: new Date(0),
     sameSite: "lax",
     secure: opts.secure,
-    ...(opts.hostOnly ? { hostPrefix: true as never } : {}),
   });
 }
 
