@@ -83,9 +83,13 @@ export default async function LoginPage({
 
     const gate = await getPhoneOtpSendGate(normalized);
     if (!gate.ok) {
+      // A code was already sent recently — take them to OTP entry instead of
+      // bouncing back to the phone step with only an error.
       loginRedirect({
-        error: gate.error,
+        step: "otp",
         phone: phoneValue,
+        error: gate.error,
+        callbackUrl,
       });
       return;
     }
